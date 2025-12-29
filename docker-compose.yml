@@ -1,0 +1,145 @@
+version: '3.8'
+
+# =============================================================================
+# SpaceDigital Dashboard - Docker Compose
+# Uses existing MySQL on host, Cloudflared runs on host as system service
+# =============================================================================
+
+services:
+  # ==========================================================================
+  # Laravel Application (PHP-FPM + Nginx + Supervisor)
+  # ==========================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spacedigital-app
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./storage:/var/www/html/storage
+    environment:
+      - APP_NAME=spacedigital
+      - APP_ENV=production
+      - APP_DEBUG=true
+      - APP_TIMEZONE=Asia/Jakarta
+      - APP_URL=https://spacedigital.czel.me
+      - APP_KEY=base64:KkhbB1MNkxw+feMIPCJYpCrGKL4X0ksw1GTSiQ1xIAU=
+      - DB_CONNECTION=mysql
+      - DB_HOST=172.17.0.1
+      - DB_PORT=3306
+      - DB_DATABASE=spacedigital_db
+      - DB_USERNAME=admin
+      - DB_PASSWORD=admin
+      - SESSION_DRIVER=file
+      - SESSION_LIFETIME=120
+      - CACHE_STORE=file
+      - QUEUE_CONNECTION=sync
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BROADCAST_CONNECTION=reverb
+      - ATLANTIC_PROXY_URL=https://autumn-butterfly-14d8.cloud-e9e.workers.dev
+      - REVERB_APP_ID=191461
+      - REVERB_APP_KEY=pcp5ymz8vjxkt5mmjvpz
+      - REVERB_APP_SECRET=Go5n8gwwuqi7twhsby9k
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      - VITE_REVERB_APP_KEY=pcp5ymz8vjxkt5mmjvpz
+      - VITE_REVERB_HOST=wss.czel.me
+      - VITE_REVERB_PORT=443
+      - VITE_REVERB_SCHEME=https
+      - TURNSTILE_SITE_KEY=0x4AAAAAACFkBXB2oulUAahp
+      - TURNSTILE_SECRET_KEY=0x4AAAAAACFkBcihiZ-vdKvb5M9iC14KNo8
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USERNAME=devianfebrisaputra@gmail.com
+      - MAIL_PASSWORD=injb znsg tkoq hehk
+      - MAIL_ENCRYPTION=tls
+      - MAIL_FROM_ADDRESS=devianfebrisaputra@gmail.com
+      - MAIL_FROM_NAME=SpaceDigital
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - spacedigital-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================================================
+  # Laravel Reverb WebSocket Server
+  # ==========================================================================
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spacedigital-reverb
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./storage:/var/www/html/storage
+    environment:
+      - APP_NAME=spacedigital
+      - APP_ENV=production
+      - APP_DEBUG=true
+      - APP_KEY=base64:KkhbB1MNkxw+feMIPCJYpCrGKL4X0ksw1GTSiQ1xIAU=
+      - DB_CONNECTION=mysql
+      - DB_HOST=172.17.0.1
+      - DB_PORT=3306
+      - DB_DATABASE=spacedigital_db
+      - DB_USERNAME=admin
+      - DB_PASSWORD=admin
+      - REVERB_APP_ID=191461
+      - REVERB_APP_KEY=pcp5ymz8vjxkt5mmjvpz
+      - REVERB_APP_SECRET=Go5n8gwwuqi7twhsby9k
+      - REVERB_HOST=0.0.0.0
+      - REVERB_PORT=8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - spacedigital-network
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Redis (for better caching/sessions - optional but recommended)
+  # ==========================================================================
+  redis:
+    image: redis:alpine
+    container_name: spacedigital-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - spacedigital-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  spacedigital-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  redis-data:
+    driver: local

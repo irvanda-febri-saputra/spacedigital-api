@@ -1,0 +1,65 @@
+# Dependencies
+/vendor
+/node_modules
+
+# Environment files (copied separately)
+.env
+.env.*
+!.env.example
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker (avoid recursive)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Build artifacts that will be rebuilt
+/public/hot
+/public/build
+
+# Storage (mounted as volume)
+/storage/*.key
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+
+# Testing
+/tests
+phpunit.xml
+.phpunit.result.cache
+
+# Documentation
+*.md
+!README.md
+/docs
+
+# Development files
+debug_*.php
+test_*.php
+fix_*.php
+migrate_*.php
+generate_*.php
+get_*.php
+send_*.php
+temp_*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
