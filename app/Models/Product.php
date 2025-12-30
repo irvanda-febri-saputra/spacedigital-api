@@ -11,13 +11,10 @@ class Product extends Model
 
     protected $fillable = [
         'bot_id',
-        'bot_external_id', // ID from bot's SQLite database
         'name',
-        'product_code',
         'description',
         'price',
         'stock',
-        'stock_count', // Synced from bot
         'category',
         'variants',
         'image_url',

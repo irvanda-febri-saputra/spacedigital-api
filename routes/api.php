@@ -29,10 +29,6 @@ Route::prefix('bot')
         // Centralized Payment Gateway
         Route::post('/payments/create', [BotApiController::class, 'createPayment']);
         Route::get('/payments/{paymentId}/status', [BotApiController::class, 'checkPaymentStatus']);
-
-        // Product Sync (bot pushes products to Laravel)
-        Route::post('/products/sync', [BotApiController::class, 'syncProducts']);
-        Route::post('/products/sync-single', [BotApiController::class, 'syncProductSingle']);
     });
 
 // Payment Webhooks (no auth, no rate limit - called by payment gateways)
