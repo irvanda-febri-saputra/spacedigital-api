@@ -703,4 +703,105 @@ class BotApiController extends Controller
             ->where('status', 'active')
             ->first();
     }
+
+    /**
+     * Sync products from bot to dashboard
+     * Bot pushes its products here, dashboard stores them
+     * 
+     * Usage: POST /api/bot/products/sync
+     */
+    public function syncProducts(Request $request)
+    {
+        $bot = $this->authenticateBot($request);
+        if (!$bot) {
+            return response()->json(['success' => false, 'error' => 'Invalid API key'], 401);
+        }
+
+        $products = $request->input('products', []);
+        $synced = 0;
+
+        foreach ($products as $productData) {
+            try {
+                \App\Models\Product::updateOrCreate(
+                    [
+                        'bot_id' => $bot->id,
+                        'bot_external_id' => $productData['id'] ?? null,
+                    ],
+                    [
+                        'name' => $productData['name'] ?? 'Unknown',
+                        'product_code' => $productData['product_code'] ?? null,
+                        'price' => $productData['price'] ?? 0,
+                        'description' => $productData['description'] ?? null,
+                        'category' => $productData['category'] ?? null,
+                        'stock_count' => $productData['stock_count'] ?? 0,
+                        'variants' => json_encode($productData['variants'] ?? []),
+                        'is_active' => $productData['is_active'] ?? true,
+                    ]
+                );
+                $synced++;
+            } catch (\Exception $e) {
+                Log::warning("Product sync failed: " . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'synced' => $synced,
+            'message' => "Synced {$synced} products"
+        ]);
+    }
+
+    /**
+     * Sync single product change (create/update/delete)
+     * 
+     * Usage: POST /api/bot/products/sync-single
+     */
+    public function syncProductSingle(Request $request)
+    {
+        $bot = $this->authenticateBot($request);
+        if (!$bot) {
+            return response()->json(['success' => false, 'error' => 'Invalid API key'], 401);
+        }
+
+        $productData = $request->input('product');
+        $action = $request->input('action', 'update');
+
+        if (!$productData) {
+            return response()->json(['success' => false, 'error' => 'Product data required'], 400);
+        }
+
+        try {
+            if ($action === 'delete') {
+                \App\Models\Product::where('bot_id', $bot->id)
+                    ->where('bot_external_id', $productData['id'])
+                    ->delete();
+            } else {
+                \App\Models\Product::updateOrCreate(
+                    [
+                        'bot_id' => $bot->id,
+                        'bot_external_id' => $productData['id'] ?? null,
+                    ],
+                    [
+                        'name' => $productData['name'] ?? 'Unknown',
+                        'product_code' => $productData['product_code'] ?? null,
+                        'price' => $productData['price'] ?? 0,
+                        'description' => $productData['description'] ?? null,
+                        'category' => $productData['category'] ?? null,
+                        'stock_count' => $productData['stock_count'] ?? 0,
+                        'variants' => json_encode($productData['variants'] ?? []),
+                        'is_active' => $productData['is_active'] ?? true,
+                    ]
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'action' => $action,
+                'message' => "Product {$action} successful"
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
 }
+

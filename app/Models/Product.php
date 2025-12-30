@@ -11,10 +11,13 @@ class Product extends Model
 
     protected $fillable = [
         'bot_id',
+        'bot_external_id',
+        'product_code',
         'name',
         'description',
         'price',
         'stock',
+        'stock_count',
         'category',
         'variants',
         'image_url',
