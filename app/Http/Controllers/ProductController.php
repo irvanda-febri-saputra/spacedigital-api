@@ -104,7 +104,7 @@ class ProductController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'bot_id' => 'required|exists:bots,id',
+            'bot_id' => 'nullable|exists:bots,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
@@ -116,14 +116,24 @@ class ProductController extends Controller
             'sort_order' => 'integer|min:0',
         ]);
 
+        // Auto-select first bot if not provided
+        $botId = $validated['bot_id'] ?? null;
+        if (!$botId) {
+            $firstBot = $user->bots()->first();
+            if (!$firstBot) {
+                return response()->json(['error' => 'No bot found. Please create a bot first.'], 400);
+            }
+            $botId = $firstBot->id;
+        }
+
         // Check bot ownership
-        $bot = Bot::findOrFail($validated['bot_id']);
+        $bot = Bot::findOrFail($botId);
         if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized - not your bot'], 403);
         }
 
         $product = Product::create([
-            'bot_id' => $validated['bot_id'],
+            'bot_id' => $botId,
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'price' => $validated['price'],
