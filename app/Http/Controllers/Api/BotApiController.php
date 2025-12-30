@@ -703,4 +703,143 @@ class BotApiController extends Controller
             ->where('status', 'active')
             ->first();
     }
+
+    // ==========================================
+    // PRODUCT SYNC ENDPOINTS
+    // ==========================================
+
+    /**
+     * Sync all products from bot to Laravel
+     * 
+     * Usage: POST /api/bot/products/sync
+     * Header: X-API-Key: {bot_api_key}
+     * Body: { products: [...] }
+     */
+    public function syncProducts(Request $request)
+    {
+        $bot = $this->authenticateBot($request);
+
+        if (!$bot) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid API key'
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'products' => 'required|array',
+            'products.*.id' => 'required|integer',
+            'products.*.name' => 'required|string',
+            'products.*.product_code' => 'nullable|string',
+            'products.*.description' => 'nullable|string',
+            'products.*.price' => 'nullable|numeric',
+            'products.*.category' => 'nullable|string',
+            'products.*.stock_count' => 'nullable|integer',
+            'products.*.is_active' => 'nullable|boolean',
+            'products.*.variants' => 'nullable|array',
+        ]);
+
+        $synced = 0;
+
+        foreach ($validated['products'] as $productData) {
+            // Use updateOrCreate with bot_external_id (bot's SQLite id)
+            $product = \App\Models\Product::updateOrCreate(
+                [
+                    'bot_id' => $bot->id,
+                    'bot_external_id' => $productData['id']
+                ],
+                [
+                    'name' => $productData['name'],
+                    'product_code' => $productData['product_code'] ?? null,
+                    'description' => $productData['description'] ?? null,
+                    'price' => $productData['price'] ?? 0,
+                    'category' => $productData['category'] ?? 'Digital Product',
+                    'stock_count' => $productData['stock_count'] ?? 0,
+                    'is_active' => $productData['is_active'] ?? true,
+                    'variants' => json_encode($productData['variants'] ?? []),
+                ]
+            );
+
+            $synced++;
+        }
+
+        Log::info("Bot {$bot->id} synced {$synced} products");
+
+        return response()->json([
+            'success' => true,
+            'synced' => $synced,
+            'message' => "{$synced} products synced successfully"
+        ]);
+    }
+
+    /**
+     * Sync single product change from bot
+     * 
+     * Usage: POST /api/bot/products/sync-single
+     * Header: X-API-Key: {bot_api_key}
+     * Body: { product: {...}, action: 'create'|'update'|'delete' }
+     */
+    public function syncProductSingle(Request $request)
+    {
+        $bot = $this->authenticateBot($request);
+
+        if (!$bot) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid API key'
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'product' => 'required|array',
+            'product.id' => 'required|integer',
+            'product.name' => 'required_unless:action,delete|string',
+            'action' => 'required|in:create,update,delete'
+        ]);
+
+        $productData = $validated['product'];
+        $action = $validated['action'];
+
+        if ($action === 'delete') {
+            // Delete product by bot_external_id
+            \App\Models\Product::where('bot_id', $bot->id)
+                ->where('bot_external_id', $productData['id'])
+                ->delete();
+
+            Log::info("Bot {$bot->id} deleted product {$productData['id']}");
+
+            return response()->json([
+                'success' => true,
+                'action' => 'deleted',
+                'message' => 'Product deleted'
+            ]);
+        }
+
+        // Create or update
+        $product = \App\Models\Product::updateOrCreate(
+            [
+                'bot_id' => $bot->id,
+                'bot_external_id' => $productData['id']
+            ],
+            [
+                'name' => $productData['name'],
+                'product_code' => $productData['product_code'] ?? null,
+                'description' => $productData['description'] ?? null,
+                'price' => $productData['price'] ?? 0,
+                'category' => $productData['category'] ?? 'Digital Product',
+                'stock_count' => $productData['stock_count'] ?? 0,
+                'is_active' => $productData['is_active'] ?? true,
+                'variants' => json_encode($productData['variants'] ?? []),
+            ]
+        );
+
+        Log::info("Bot {$bot->id} {$action}d product {$productData['id']}");
+
+        return response()->json([
+            'success' => true,
+            'action' => $action,
+            'product_id' => $product->id,
+            'message' => "Product {$action}d successfully"
+        ]);
+    }
 }
