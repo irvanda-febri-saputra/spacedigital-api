@@ -230,44 +230,49 @@ class ProductController extends Controller
             'stock_data' => 'required|string'
         ]);
 
-        // Notify bot to add stock via webhook (optional - graceful fallback)
-    $webhookSuccess = false;
+    // Broadcast stock add via WebSocket (real-time to all bots)
     try {
         $bot = $product->bot;
-        if ($bot && $bot->webhook_url) {
-            $webhookUrl = rtrim($bot->webhook_url, '/') . '/webhook/product-update';
-            
-            $response = Http::timeout(5)->post($webhookUrl, [
+        
+        // Broadcast via WebSocket Hub
+        $wsUrl = env('WEBSOCKET_HUB_URL', 'http://localhost:8080');
+        $wsSecret = env('WEBSOCKET_BROADCAST_SECRET');
+        
+        $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
+            'secret' => $wsSecret,
+            'channel' => "bot.{$bot->id}",
+            'event' => 'product.stock_added',
+            'data' => [
                 'product_id' => $product->bot_external_id,
-                'action' => 'add_stock',
-                'data' => [
-                    'variant_id' => $validated['variant_id'],
-                    'stock_data' => $validated['stock_data']
-                ]
-            ]);
+                'variant_id' => $validated['variant_id'],
+                'stock_data' => $validated['stock_data'],
+                'timestamp' => now()->toIso8601String()
+            ]
+        ]);
+        
+        if ($response->successful()) {
+            $result = $response->json();
+            Log::info("Stock add broadcasted to {$result['clients']} bot(s) for product {$product->id}");
             
-            if ($response->successful()) {
-                $webhookSuccess = true;
-                Log::info("Notified bot to add stock for product: {$product->id}");
-            } else {
-                Log::warning("Webhook call failed for product {$product->id}: " . $response->body());
-            }
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock ditambahkan! Bot akan sync dalam beberapa detik.',
+                'broadcast_sent' => true,
+                'clients_notified' => $result['clients'] ?? 0
+            ]);
         } else {
-            Log::info("No webhook URL configured for bot {$bot->id}, stock add manual only");
+            Log::warning("WebSocket broadcast failed for product {$product->id}: " . $response->body());
         }
     } catch (\Exception $e) {
-        Log::warning("Failed to notify bot for stock add: " . $e->getMessage());
+        Log::warning("Failed to broadcast stock add: " . $e->getMessage());
     }
     
-    // Always return success (webhook is optional)
+    // Fallback response if broadcast fails
     return response()->json([
         'success' => true,
-        'message' => $webhookSuccess 
-            ? 'Stock ditambahkan ke bot via webhook' 
-            : 'Request berhasil. Silakan tambahkan stock manual di bot atau konfigurasikan webhook URL.',
-        'webhook_notified' => $webhookSuccess
-    ]);
-    }
+        'message' => 'Stock request diterima. Bot akan sync otomatis.',
+        'broadcast_sent' => false
+    ]);}
 
     /**
      * API: Delete product
