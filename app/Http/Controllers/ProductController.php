@@ -254,11 +254,19 @@ class ProductController extends Controller
             $result = $response->json();
             Log::info("Stock add broadcasted to {$result['clients']} bot(s) for product {$product->id}");
             
+            // Count stock items added
+            $stockLines = array_filter(explode("\n", $validated['stock_data']));
+            $stockCount = count($stockLines);
+            
+            // Update stock_count in Laravel for immediate dashboard refresh
+            $product->increment('stock', $stockCount);
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Stock ditambahkan! Bot akan sync dalam beberapa detik.',
                 'broadcast_sent' => true,
-                'clients_notified' => $result['clients'] ?? 0
+                'clients_notified' => $result['clients'] ?? 0,
+                'stock_added' => $stockCount
             ]);
         } else {
             Log::warning("WebSocket broadcast failed for product {$product->id}: " . $response->body());
