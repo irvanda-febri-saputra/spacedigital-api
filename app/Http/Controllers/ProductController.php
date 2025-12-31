@@ -181,29 +181,44 @@ class ProductController extends Controller
 
         $product->update($validated);
 
-        // Notify bot of product update (two-way sync)
+        // Broadcast product update via WebSocket (includes variants)
         try {
             $bot = $product->bot;
-            if ($bot && $bot->webhook_url) {
-                $webhookUrl = rtrim($bot->webhook_url, '/') . '/webhook/product-update';
-
-                Http::timeout(5)->post($webhookUrl, [
+            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
+            $wsSecret = env('WS_BROADCAST_SECRET');
+            
+            // Parse variants if it's JSON string
+            $variants = [];
+            if ($product->variants) {
+                $variants = is_string($product->variants) 
+                    ? json_decode($product->variants, true) 
+                    : $product->variants;
+            }
+            
+            $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
+                'secret' => $wsSecret,
+                'channel' => "bot.{$bot->id}",
+                'event' => 'product.updated',
+                'data' => [
                     'product_id' => $product->bot_external_id,
-                    'action' => 'update',
-                    'data' => [
-                        'name' => $product->name,
-                        'description' => $product->description,
-                        'price' => $product->price,
-                        'category' => $product->category,
-                        'is_active' => $product->is_active,
-                    ]
-                ]);
-
-                Log::info("Notified bot of product update: {$product->id}");
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'category' => $product->category,
+                    'is_active' => $product->is_active,
+                    'variants' => $variants,
+                    'timestamp' => now()->toIso8601String()
+                ]
+            ]);
+            
+            if ($response->successful()) {
+                $result = $response->json();
+                Log::info("Product update broadcasted to {$result['clients']} bot(s) for product {$product->id}");
+            } else {
+                Log::warning("WebSocket broadcast failed for product {$product->id}: " . $response->body());
             }
         } catch (\Exception $e) {
-            Log::warning("Failed to notify bot: " . $e->getMessage());
-            // Don't fail the request if webhook fails
+            Log::warning("Failed to broadcast product update: " . $e->getMessage());
         }
 
         return response()->json([
