@@ -128,6 +128,7 @@ Route::middleware('auth.api.token')->prefix('dashboard')->group(function () {
     Route::post('/products', [\App\Http\Controllers\ProductController::class, 'apiStore']);
     Route::get('/products/{product}', [\App\Http\Controllers\ProductController::class, 'apiShow']);
     Route::put('/products/{product}', [\App\Http\Controllers\ProductController::class, 'apiUpdate']);
+    Route::post('/products/{product}/stock', [\App\Http\Controllers\ProductController::class, 'addStock']);
     Route::delete('/products/{product}', [\App\Http\Controllers\ProductController::class, 'apiDestroy']);
     Route::post('/products/bulk-update', [\App\Http\Controllers\ProductController::class, 'apiBulkUpdate']);
 

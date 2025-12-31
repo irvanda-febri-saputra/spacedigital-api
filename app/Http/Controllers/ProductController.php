@@ -212,6 +212,59 @@ class ProductController extends Controller
     }
 
     /**
+     * API: Add stock to product (will notify bot via webhook)
+     */
+    public function addStock(Request $request, Product $product)
+    {
+        $user = $request->user();
+
+        // Check ownership
+        if (!$user->isSuperAdmin() && $product->bot->user_id !== $user->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'variant_id' => 'nullable|integer',
+            'stock_data' => 'required|string'
+        ]);
+
+        // Notify bot to add stock via webhook
+        try {
+            $bot = $product->bot;
+            if ($bot && $bot->webhook_url) {
+                $webhookUrl = rtrim($bot->webhook_url, '/') . '/webhook/product-update';
+                
+                Http::timeout(5)->post($webhookUrl, [
+                    'product_id' => $product->bot_external_id,
+                    'action' => 'add_stock',
+                    'data' => [
+                        'variant_id' => $validated['variant_id'],
+                        'stock_data' => $validated['stock_data']
+                    ]
+                ]);
+                
+                Log::info("Notified bot to add stock for product: {$product->id}");
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Stock akan ditambahkan ke bot'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Bot webhook URL tidak dikonfigurasi'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error("Failed to notify bot for stock add: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Gagal mengirim notifikasi ke bot'
+            ], 500);
+        }
+    }
+
+    /**
      * API: Delete product
      */
     public function apiDestroy(Request $request, Product $product)
