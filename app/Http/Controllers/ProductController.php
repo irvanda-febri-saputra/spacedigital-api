@@ -179,6 +179,31 @@ class ProductController extends Controller
 
         $product->update($validated);
 
+        // Notify bot of product update (two-way sync)
+        try {
+            $bot = $product->bot;
+            if ($bot && $bot->webhook_url) {
+                $webhookUrl = rtrim($bot->webhook_url, '/') . '/webhook/product-update';
+
+                Http::timeout(5)->post($webhookUrl, [
+                    'product_id' => $product->bot_external_id,
+                    'action' => 'update',
+                    'data' => [
+                        'name' => $product->name,
+                        'description' => $product->description,
+                        'price' => $product->price,
+                        'category' => $product->category,
+                        'is_active' => $product->is_active,
+                    ]
+                ]);
+
+                Log::info("Notified bot of product update: {$product->id}");
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to notify bot: " . $e->getMessage());
+            // Don't fail the request if webhook fails
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Product updated successfully',
