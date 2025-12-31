@@ -235,8 +235,8 @@ class ProductController extends Controller
         $bot = $product->bot;
         
         // Broadcast via WebSocket Hub
-        $wsUrl = env('WEBSOCKET_HUB_URL', 'http://localhost:8080');
-        $wsSecret = env('WEBSOCKET_BROADCAST_SECRET');
+        $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
+        $wsSecret = env('WS_BROADCAST_SECRET');
         
         $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
             'secret' => $wsSecret,
