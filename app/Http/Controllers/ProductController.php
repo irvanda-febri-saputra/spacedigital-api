@@ -228,40 +228,43 @@ class ProductController extends Controller
             'stock_data' => 'required|string'
         ]);
 
-        // Notify bot to add stock via webhook
-        try {
-            $bot = $product->bot;
-            if ($bot && $bot->webhook_url) {
-                $webhookUrl = rtrim($bot->webhook_url, '/') . '/webhook/product-update';
-                
-                Http::timeout(5)->post($webhookUrl, [
-                    'product_id' => $product->bot_external_id,
-                    'action' => 'add_stock',
-                    'data' => [
-                        'variant_id' => $validated['variant_id'],
-                        'stock_data' => $validated['stock_data']
-                    ]
-                ]);
-                
+        // Notify bot to add stock via webhook (optional - graceful fallback)
+    $webhookSuccess = false;
+    try {
+        $bot = $product->bot;
+        if ($bot && $bot->webhook_url) {
+            $webhookUrl = rtrim($bot->webhook_url, '/') . '/webhook/product-update';
+            
+            $response = Http::timeout(5)->post($webhookUrl, [
+                'product_id' => $product->bot_external_id,
+                'action' => 'add_stock',
+                'data' => [
+                    'variant_id' => $validated['variant_id'],
+                    'stock_data' => $validated['stock_data']
+                ]
+            ]);
+            
+            if ($response->successful()) {
+                $webhookSuccess = true;
                 Log::info("Notified bot to add stock for product: {$product->id}");
-                
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Stock akan ditambahkan ke bot'
-                ]);
             } else {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Bot webhook URL tidak dikonfigurasi'
-                ], 500);
+                Log::warning("Webhook call failed for product {$product->id}: " . $response->body());
             }
-        } catch (\Exception $e) {
-            Log::error("Failed to notify bot for stock add: " . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Gagal mengirim notifikasi ke bot'
-            ], 500);
+        } else {
+            Log::info("No webhook URL configured for bot {$bot->id}, stock add manual only");
         }
+    } catch (\Exception $e) {
+        Log::warning("Failed to notify bot for stock add: " . $e->getMessage());
+    }
+    
+    // Always return success (webhook is optional)
+    return response()->json([
+        'success' => true,
+        'message' => $webhookSuccess 
+            ? 'Stock ditambahkan ke bot via webhook' 
+            : 'Request berhasil. Silakan tambahkan stock manual di bot atau konfigurasikan webhook URL.',
+        'webhook_notified' => $webhookSuccess
+    ]);
     }
 
     /**
