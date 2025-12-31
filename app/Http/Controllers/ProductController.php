@@ -309,11 +309,40 @@ class ProductController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        $bot = $product->bot;
+        $productId = $product->bot_external_id;
+
+        // Delete product
         $product->delete();
+
+        // Broadcast delete via WebSocket
+        try {
+            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
+            $wsSecret = env('WS_BROADCAST_SECRET');
+            
+            $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
+                'secret' => $wsSecret,
+                'channel' => "bot.{$bot->id}",
+                'event' => 'product.deleted',
+                'data' => [
+                    'product_id' => $productId,
+                    'timestamp' => now()->toIso8601String()
+                ]
+            ]);
+            
+            if ($response->successful()) {
+                $result = $response->json();
+                Log::info("Product delete broadcasted to {$result['clients']} bot(s)");
+            } else {
+                Log::warning("WebSocket broadcast failed for product delete: " . $response->body());
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to broadcast product delete: " . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Product deleted successfully',
+            'message' => 'Product deleted successfully'
         ]);
     }
 
