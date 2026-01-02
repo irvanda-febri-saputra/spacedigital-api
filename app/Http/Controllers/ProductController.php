@@ -148,6 +148,45 @@ class ProductController extends Controller
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
+        // Broadcast new product to bot via WebSocket
+        try {
+            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
+            $wsSecret = env('WS_BROADCAST_SECRET');
+            
+            // Parse variants if it's JSON string
+            $variants = [];
+            if ($product->variants) {
+                $variants = is_string($product->variants) 
+                    ? json_decode($product->variants, true) 
+                    : $product->variants;
+            }
+            
+            $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
+                'secret' => $wsSecret,
+                'channel' => "bot.{$bot->id}",
+                'event' => 'product.created',
+                'data' => [
+                    'product_id' => $product->id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'category' => $product->category,
+                    'is_active' => $product->is_active,
+                    'variants' => $variants,
+                    'timestamp' => now()->toIso8601String()
+                ]
+            ]);
+            
+            if ($response->successful()) {
+                $result = $response->json();
+                Log::info("Product creation broadcasted to {$result['clients']} bot(s) for product {$product->id}");
+            } else {
+                Log::warning("WebSocket broadcast failed for new product {$product->id}: " . $response->body());
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to broadcast product creation: " . $e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Product created successfully',
