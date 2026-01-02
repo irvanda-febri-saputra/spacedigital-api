@@ -132,6 +132,9 @@ Route::middleware('auth.api.token')->prefix('dashboard')->group(function () {
     Route::delete('/products/{product}', [\App\Http\Controllers\ProductController::class, 'apiDestroy']);
     Route::post('/products/bulk-update', [\App\Http\Controllers\ProductController::class, 'apiBulkUpdate']);
 
+    // Broadcast
+    Route::post('/broadcast', [\App\Http\Controllers\BroadcastController::class, 'send']);
+
     // Create Transaction (Test Gateway Credentials)
     Route::post('/test-transaction', [\App\Http\Controllers\CreateTransactionController::class, 'apiStore']);
     Route::get('/test-transaction/{orderId}/status', [\App\Http\Controllers\CreateTransactionController::class, 'apiCheckStatus']);
