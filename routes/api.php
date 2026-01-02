@@ -134,6 +134,9 @@ Route::middleware('auth.api.token')->prefix('dashboard')->group(function () {
 
     // Broadcast
     Route::post('/broadcast', [\App\Http\Controllers\BroadcastController::class, 'send']);
+    
+    // Image Upload (Catbox proxy)
+    Route::post('/upload-image', [\App\Http\Controllers\ImageUploadController::class, 'uploadToCatbox']);
 
     // Create Transaction (Test Gateway Credentials)
     Route::post('/test-transaction', [\App\Http\Controllers\CreateTransactionController::class, 'apiStore']);
