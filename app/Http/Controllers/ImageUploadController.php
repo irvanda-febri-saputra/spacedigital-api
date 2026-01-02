@@ -19,13 +19,17 @@ class ImageUploadController extends Controller
         try {
             $image = $request->file('image');
             
-            // Upload to Catbox using multipart
-            $response = Http::attach(
-                'fileToUpload',
-                file_get_contents($image->getRealPath()),
-                $image->getClientOriginalName()
-            )->post('https://catbox.moe/user/api.php', [
-                'reqtype' => 'fileupload'
+            // Upload to Catbox using multipart form data
+            $response = Http::asMultipart()->post('https://catbox.moe/user/api.php', [
+                [
+                    'name' => 'reqtype',
+                    'contents' => 'fileupload'
+                ],
+                [
+                    'name' => 'fileToUpload',
+                    'contents' => fopen($image->getRealPath(), 'r'),
+                    'filename' => $image->getClientOriginalName()
+                ]
             ]);
 
             if ($response->successful()) {
