@@ -12,6 +12,14 @@ class ImageUploadController extends Controller
      */
     public function uploadToCatbox(Request $request)
     {
+        // Handle CORS preflight
+        if ($request->getMethod() === 'OPTIONS') {
+            return response()->json([], 200)
+                ->header('Access-Control-Allow-Origin', '*')
+                ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        }
+
         $request->validate([
             'image' => 'required|file|max:10240', // Max 10MB, any file type for now
         ]);
@@ -40,20 +48,20 @@ class ImageUploadController extends Controller
                     return response()->json([
                         'success' => true,
                         'url' => $imageUrl
-                    ]);
+                    ])->header('Access-Control-Allow-Origin', '*');
                 }
             }
 
             return response()->json([
                 'success' => false,
                 'error' => 'Upload failed: ' . $response->body()
-            ], 500);
+            ], 500)->header('Access-Control-Allow-Origin', '*');
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
-            ], 500);
+            ], 500)->header('Access-Control-Allow-Origin', '*');
         }
     }
 }
