@@ -13,8 +13,9 @@ class ImageUploadController extends Controller
     public function uploadToCatbox(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|max:10240', // Max 10MB
+            'image' => 'required|file|max:10240', // Max 10MB, any file type for now
         ]);
+
 
         try {
             $image = $request->file('image');
