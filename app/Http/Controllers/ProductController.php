@@ -308,8 +308,9 @@ class ProductController extends Controller
             $result = $response->json();
             Log::info("Stock add broadcasted to {$result['clients']} bot(s) for product {$product->id}");
             
-            // Count stock items added
-            $stockLines = array_filter(explode("\n", $validated['stock_data']));
+            // Count stock items added - normalize line endings (browser sends \r\n)
+            $normalizedData = str_replace("\r\n", "\n", $validated['stock_data']);
+            $stockLines = array_filter(explode("\n", $normalizedData));
             $stockCount = count($stockLines);
             
             // Update stock_count in Laravel for immediate dashboard refresh
