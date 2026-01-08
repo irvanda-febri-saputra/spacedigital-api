@@ -852,23 +852,39 @@ class BotApiController extends Controller
                 $currentVariants = $product->variants;
                 $updated = false;
 
+                \Log::info("Processing " . count($validated['variants']) . " variants for product {$product->name}");
+
                 foreach ($validated['variants'] as $newVariant) {
+                    $found = false;
                     foreach ($currentVariants as &$key) {
-                        // Match by code (preferred) or name
+                        // Normalize names for comparison (trim + lowercase)
+                        $currName = trim(strtolower($key['name'] ?? ''));
+                        $newName = trim(strtolower($newVariant['name'] ?? ''));
+                        
+                        // Strict code match OR loose name match
                         $matchByCode = !empty($newVariant['variant_code']) && 
                                       ($key['variant_code'] ?? '') === $newVariant['variant_code'];
                         
-                        $matchByName = ($key['name'] ?? '') === ($newVariant['name'] ?? '');
+                        $matchByName = $currName === $newName;
 
                         if ($matchByCode || $matchByName) {
-                            $key['stock_count'] = $newVariant['stock_count'];
+                            $oldStock = $key['stock_count'] ?? 0;
+                            $newStock = $newVariant['stock_count'];
+                            
+                            $key['stock_count'] = $newStock;
                             // Also update 'stock' if it exists in variant structure
                             if (isset($key['stock'])) {
-                                $key['stock'] = $newVariant['stock_count'];
+                                $key['stock'] = $newStock;
                             }
                             $updated = true;
+                            $found = true;
+                            
+                            \Log::info("Variant matched: updated '{$key['name']}' stock {$oldStock} -> {$newStock}");
                             break;
                         }
+                    }
+                    if (!$found) {
+                        \Log::warning("Variant '{$newVariant['name']}' (code: " . ($newVariant['variant_code']??'-') . ") sent by bot but NOT found in dashboard product '{$product->name}'");
                     }
                 }
 
