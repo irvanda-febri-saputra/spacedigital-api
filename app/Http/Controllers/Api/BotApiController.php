@@ -773,25 +773,28 @@ class BotApiController extends Controller
         try {
             if ($action === 'delete') {
                 \App\Models\Product::where('bot_id', $bot->id)
-                    ->where('bot_external_id', $productData['id'])
+                    ->where('name', $productData['name'])
                     ->delete();
             } else {
-                \App\Models\Product::updateOrCreate(
+                // Find by name, not bot_external_id (which is always null/wrong)
+                $product = \App\Models\Product::updateOrCreate(
                     [
                         'bot_id' => $bot->id,
-                        'bot_external_id' => $productData['id'] ?? null,
+                        'name' => $productData['name'], // Search by NAME, not ID
                     ],
                     [
-                        'name' => $productData['name'] ?? 'Unknown',
                         'product_code' => $productData['product_code'] ?? null,
                         'price' => $productData['price'] ?? 0,
                         'description' => $productData['description'] ?? null,
                         'category' => $productData['category'] ?? null,
-                        'stock_count' => $productData['stock_count'] ?? 0,
+                        'stock' => $productData['stock_count'] ?? 0, // Update stock field
+                        'stock_count' => $productData['stock_count'] ?? 0, // And stock_count
                         'variants' => json_encode($productData['variants'] ?? []),
                         'is_active' => $productData['is_active'] ?? true,
                     ]
                 );
+                
+                \Log::info("Product synced from bot: {$product->name}, stock: {$product->stock}");
             }
 
             return response()->json([
