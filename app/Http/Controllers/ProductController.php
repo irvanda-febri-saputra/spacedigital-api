@@ -300,8 +300,13 @@ class ProductController extends Controller
              
              if (is_array($variants)) {
                  foreach ($variants as $v) {
-                     // Loose comparison for ID (string vs int)
-                     if (($v['id'] ?? null) == $validated['variant_id']) {
+                     // Robust comparison: ID, Name, or Code
+                     $input = trim(strtolower($validated['variant_id'] ?? ''));
+                     $vId = trim(strtolower($v['id'] ?? ''));
+                     $vName = trim(strtolower($v['name'] ?? ''));
+                     $vCode = trim(strtolower($v['variant_code'] ?? ''));
+
+                     if ($input === $vId || $input === $vName || $input === $vCode) {
                          $variantCode = $v['variant_code'] ?? null;
                          // fallback to name if code missing
                          if (!$variantCode) $variantCode = $v['name'] ?? null; 
@@ -310,6 +315,8 @@ class ProductController extends Controller
                  }
              }
         }
+        
+        \Log::info("Resolved Variant Code: " . ($variantCode ?? 'NULL'));
 
     // Broadcast stock add via WebSocket (real-time to all bots)
     try {
