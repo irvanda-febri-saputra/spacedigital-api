@@ -806,5 +806,59 @@ class BotApiController extends Controller
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Update product stock count ONLY (no product creation)
+     * This prevents duplicate products when syncing from bot
+     * 
+     * Usage: POST /api/bot/products/update-stock
+     */
+    public function updateProductStock(Request $request)
+    {
+        $bot = $this->authenticateBot($request);
+        if (!$bot) {
+            return response()->json(['success' => false, 'error' => 'Invalid API key'], 401);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'stock_count' => 'required|integer|min:0',
+        ]);
+
+        try {
+            // Find product by name - DO NOT create if not exists
+            $product = \App\Models\Product::where('bot_id', $bot->id)
+                ->where('name', $validated['name'])
+                ->first();
+
+            if (!$product) {
+                \Log::warning("Stock update failed: Product '{$validated['name']}' not found for bot {$bot->id}");
+                return response()->json([
+                    'success' => false,
+                    'error' => "Product '{$validated['name']}' not found in dashboard. Create it from dashboard first."
+                ], 404);
+            }
+
+            // Update stock fields only
+            $product->update([
+                'stock' => $validated['stock_count'],
+                'stock_count' => $validated['stock_count'],
+            ]);
+
+            \Log::info("Stock updated: {$product->name} = {$validated['stock_count']} (bot: {$bot->id})");
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock updated successfully',
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'stock' => $product->stock
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Stock update error: " . $e->getMessage());
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
 }
 

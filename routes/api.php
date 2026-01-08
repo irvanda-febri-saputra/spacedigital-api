@@ -33,6 +33,7 @@ Route::prefix('bot')
         // Product Sync (Bot pushes products to Dashboard)
         Route::post('/products/sync', [BotApiController::class, 'syncProducts']);
         Route::post('/products/sync-single', [BotApiController::class, 'syncProductSingle']);
+        Route::post('/products/update-stock', [BotApiController::class, 'updateProductStock']);
     });
 
 // Payment Webhooks (no auth, no rate limit - called by payment gateways)
