@@ -279,10 +279,37 @@ class ProductController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        \Log::info("AddStock Request for Product {$product->id}:", $request->all());
+
         $validated = $request->validate([
-            'variant_id' => 'nullable|integer',
+            'variant_id' => 'nullable', // Loose type validation to handle empty strings
+            'variant_code' => 'nullable|string',
+            'variant_name' => 'nullable|string',
             'stock_data' => 'required|string'
         ]);
+
+        // Resolve variant code if only ID provided
+        $variantCode = $validated['variant_code'] ?? null;
+        
+        // If code matches empty string, set to null
+        if ($variantCode === '') $variantCode = null;
+
+        if (empty($variantCode) && !empty($validated['variant_id'])) {
+             // Parse variants from product (could be JSON string or array)
+             $variants = is_string($product->variants) ? json_decode($product->variants, true) : $product->variants;
+             
+             if (is_array($variants)) {
+                 foreach ($variants as $v) {
+                     // Loose comparison for ID (string vs int)
+                     if (($v['id'] ?? null) == $validated['variant_id']) {
+                         $variantCode = $v['variant_code'] ?? null;
+                         // fallback to name if code missing
+                         if (!$variantCode) $variantCode = $v['name'] ?? null; 
+                         break;
+                     }
+                 }
+             }
+        }
 
     // Broadcast stock add via WebSocket (real-time to all bots)
     try {
@@ -298,7 +325,7 @@ class ProductController extends Controller
             'event' => 'product.stock_added',
             'data' => [
                 'product_name' => $product->name, // Send name instead of ID
-                'variant_code' => $validated['variant_code'] ?? null, // Send variant code
+                'variant_code' => $variantCode, // Send resolved variant code
                 'stock_data' => $validated['stock_data'],
                 'timestamp' => now()->toIso8601String()
             ]
@@ -435,5 +462,62 @@ class ProductController extends Controller
             'success' => true,
             'message' => 'Products reordered successfully',
         ]);
+    }
+
+    /**
+     * Bot API: Sync single product (stock count update from bot)
+     */
+    public function syncSingle(Request $request)
+    {
+        $validated = $request->validate([
+            'id' => 'required|integer',
+            'name' => 'required|string',
+            'stock_count' => 'required|integer|min:0',
+            'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable|integer',
+            'variants.*.variant_code' => 'nullable|string',
+            'variants.*.stock_count' => 'required|integer|min:0',
+        ]);
+
+        try {
+            // Find product by bot's internal ID is not reliable
+            // Find by name instead (unique per bot)
+            $botId = $request->header('X-Bot-Id'); // Assuming bot sends its ID
+            
+            if (!$botId) {
+                // Fallback: find by name only (assuming unique names)
+                $product = Product::where('name', $validated['name'])->first();
+            } else {
+                $product = Product::where('bot_id', $botId)
+                    ->where('name', $validated['name'])
+                    ->first();
+            }
+
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Product '{$validated['name']}' not found in dashboard"
+                ], 404);
+            }
+
+            // Update stock count
+            $product->update(['stock' => $validated['stock_count']]);
+
+            Log::info("Product stock synced from bot: {$product->name} = {$validated['stock_count']}");
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product stock updated successfully',
+                'product_id' => $product->id,
+                'stock' => $product->stock
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Bot sync-single error: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Sync failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
