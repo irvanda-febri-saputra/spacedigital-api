@@ -823,6 +823,10 @@ class BotApiController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'stock_count' => 'required|integer|min:0',
+            'variants' => 'nullable|array',
+            'variants.*.variant_code' => 'nullable|string',
+            'variants.*.name' => 'nullable|string',
+            'variants.*.stock_count' => 'required|integer|min:0',
         ]);
 
         try {
@@ -839,11 +843,41 @@ class BotApiController extends Controller
                 ], 404);
             }
 
-            // Update stock fields only
-            $product->update([
-                'stock' => $validated['stock_count'],
-                'stock_count' => $validated['stock_count'],
-            ]);
+            // Update product stock
+            $product->stock = $validated['stock_count'];
+            $product->stock_count = $validated['stock_count'];
+
+            // Handle variants if provided
+            if (!empty($validated['variants']) && is_array($product->variants)) {
+                $currentVariants = $product->variants;
+                $updated = false;
+
+                foreach ($validated['variants'] as $newVariant) {
+                    foreach ($currentVariants as &$key) {
+                        // Match by code (preferred) or name
+                        $matchByCode = !empty($newVariant['variant_code']) && 
+                                      ($key['variant_code'] ?? '') === $newVariant['variant_code'];
+                        
+                        $matchByName = ($key['name'] ?? '') === ($newVariant['name'] ?? '');
+
+                        if ($matchByCode || $matchByName) {
+                            $key['stock_count'] = $newVariant['stock_count'];
+                            // Also update 'stock' if it exists in variant structure
+                            if (isset($key['stock'])) {
+                                $key['stock'] = $newVariant['stock_count'];
+                            }
+                            $updated = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ($updated) {
+                    $product->variants = $currentVariants;
+                }
+            }
+
+            $product->save();
 
             \Log::info("Stock updated: {$product->name} = {$validated['stock_count']} (bot: {$bot->id})");
 
