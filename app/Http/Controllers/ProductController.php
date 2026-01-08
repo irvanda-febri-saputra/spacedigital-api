@@ -297,8 +297,8 @@ class ProductController extends Controller
             'channel' => "bot.{$bot->id}",
             'event' => 'product.stock_added',
             'data' => [
-                'product_id' => $product->bot_external_id,
-                'variant_id' => $validated['variant_id'],
+                'product_name' => $product->name, // Send name instead of ID
+                'variant_code' => $validated['variant_code'] ?? null, // Send variant code
                 'stock_data' => $validated['stock_data'],
                 'timestamp' => now()->toIso8601String()
             ]
