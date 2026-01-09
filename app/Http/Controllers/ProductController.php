@@ -227,6 +227,7 @@ class ProductController extends Controller
         }
 
         $validated = $request->validate([
+            'product_code' => 'nullable|string|max:50',
             'name' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|numeric|min:0',
