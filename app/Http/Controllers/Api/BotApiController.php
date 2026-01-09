@@ -847,6 +847,14 @@ class BotApiController extends Controller
             $product->stock = $validated['stock_count'];
             $product->stock_count = $validated['stock_count'];
 
+            // DEBUG: Log what we received
+            \Log::info("updateProductStock DEBUG for {$product->name}:", [
+                'variants_in_request' => $validated['variants'] ?? 'NULL',
+                'variants_in_db_type' => gettype($product->variants),
+                'variants_in_db_is_array' => is_array($product->variants),
+                'variants_in_db_count' => is_array($product->variants) ? count($product->variants) : 'N/A',
+            ]);
+
             // Handle variants if provided
             if (!empty($validated['variants']) && is_array($product->variants)) {
                 $currentVariants = $product->variants;
