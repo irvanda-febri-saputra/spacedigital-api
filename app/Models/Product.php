@@ -56,4 +56,44 @@ class Product extends Model
     {
         return $query->where('bot_id', $botId);
     }
+
+    /**
+     * Get product variants (new separate table)
+     */
+    public function productVariants()
+    {
+        return $this->hasMany(ProductVariant::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Get stock items for this product
+     */
+    public function stockItems()
+    {
+        return $this->hasMany(StockItem::class);
+    }
+
+    /**
+     * Get available (unsold) stock count
+     */
+    public function getAvailableStockCountAttribute()
+    {
+        return $this->stockItems()->where('is_sold', false)->count();
+    }
+
+    /**
+     * Get variants with stock counts (for API response)
+     */
+    public function getVariantsWithStockAttribute()
+    {
+        return $this->productVariants()->active()->get()->map(function ($variant) {
+            return [
+                'id' => $variant->id,
+                'variant_code' => $variant->variant_code,
+                'name' => $variant->name,
+                'price' => $variant->price,
+                'stock_count' => $variant->available_stock,
+            ];
+        });
+    }
 }

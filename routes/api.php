@@ -133,6 +133,20 @@ Route::middleware('auth.api.token')->prefix('dashboard')->group(function () {
     Route::delete('/products/{product}', [\App\Http\Controllers\ProductController::class, 'apiDestroy']);
     Route::post('/products/bulk-update', [\App\Http\Controllers\ProductController::class, 'apiBulkUpdate']);
 
+    // Product Variants
+    Route::get('/products/{product}/variants', [\App\Http\Controllers\ProductVariantController::class, 'apiIndex']);
+    Route::post('/products/{product}/variants', [\App\Http\Controllers\ProductVariantController::class, 'apiStore']);
+    Route::put('/variants/{variant}', [\App\Http\Controllers\ProductVariantController::class, 'apiUpdate']);
+    Route::delete('/variants/{variant}', [\App\Http\Controllers\ProductVariantController::class, 'apiDestroy']);
+
+    // Stock Items
+    Route::get('/stocks', [\App\Http\Controllers\StockController::class, 'apiIndex']);
+    Route::post('/stocks', [\App\Http\Controllers\StockController::class, 'apiStore']);
+    Route::put('/stocks/{stock}', [\App\Http\Controllers\StockController::class, 'apiUpdate']);
+    Route::delete('/stocks/{stock}', [\App\Http\Controllers\StockController::class, 'apiDestroy']);
+    Route::post('/stocks/bulk-import', [\App\Http\Controllers\StockController::class, 'apiBulkImport']);
+    Route::get('/stocks/stats', [\App\Http\Controllers\StockController::class, 'apiStats']);
+
     // Broadcast
     Route::post('/broadcast', [\App\Http\Controllers\BroadcastController::class, 'send']);
     
