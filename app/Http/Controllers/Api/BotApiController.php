@@ -861,9 +861,9 @@ class BotApiController extends Controller
                         $currName = trim(strtolower($key['name'] ?? ''));
                         $newName = trim(strtolower($newVariant['name'] ?? ''));
                         
-                        // Strict code match OR loose name match
+                        // Strict code match (case-insensitive) OR loose name match
                         $matchByCode = !empty($newVariant['variant_code']) && 
-                                      ($key['variant_code'] ?? '') === $newVariant['variant_code'];
+                                      strtolower($key['variant_code'] ?? '') === strtolower($newVariant['variant_code']);
                         
                         $matchByName = $currName === $newName;
 
