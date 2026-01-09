@@ -918,5 +918,47 @@ class BotApiController extends Controller
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Mark stocks as sold (called by bot when items are sold)
+     * 
+     * Usage: POST /api/bot/stocks/sold
+     * Body: { stock_ids: [1,2,3], trx_id: "...", telegram_id: "..." }
+     */
+    public function markStocksSold(Request $request)
+    {
+        try {
+            $request->validate([
+                'stock_ids' => 'required|array',
+                'stock_ids.*' => 'integer',
+                'trx_id' => 'nullable|string',
+                'telegram_id' => 'nullable|string',
+            ]);
+
+            $stockIds = $request->stock_ids;
+            $trxId = $request->trx_id;
+            $telegramId = $request->telegram_id;
+
+            $updated = \App\Models\StockItem::whereIn('id', $stockIds)
+                ->update([
+                    'is_sold' => true,
+                    'sold_at' => now(),
+                    'sold_to_telegram_id' => $telegramId,
+                    'sold_order_id' => $trxId,
+                ]);
+
+            Log::info("Marked {$updated} stocks as sold. TRX: {$trxId}");
+
+            return response()->json([
+                'success' => true,
+                'message' => "Marked {$updated} stocks as sold",
+                'updated_count' => $updated,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Mark stocks sold error: " . $e->getMessage());
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
 }
 

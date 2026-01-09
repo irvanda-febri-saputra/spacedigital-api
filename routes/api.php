@@ -34,6 +34,9 @@ Route::prefix('bot')
         Route::post('/products/sync', [BotApiController::class, 'syncProducts']);
         Route::post('/products/sync-single', [BotApiController::class, 'syncProductSingle']);
         Route::post('/products/update-stock', [BotApiController::class, 'updateProductStock']);
+        
+        // Stock sold notification (Bot notifies when stock is sold)
+        Route::post('/stocks/sold', [BotApiController::class, 'markStocksSold']);
     });
 
 // Payment Webhooks (no auth, no rate limit - called by payment gateways)
