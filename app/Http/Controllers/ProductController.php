@@ -135,6 +135,22 @@ class ProductController extends Controller
             return response()->json(['error' => 'Unauthorized - not your bot'], 403);
         }
 
+        // Check for duplicate product name in same bot
+        $existingProduct = Product::where('bot_id', $botId)
+            ->where('name', $validated['name'])
+            ->first();
+        
+        if ($existingProduct) {
+            // Return existing product instead of creating duplicate
+            Log::info("Product '{$validated['name']}' already exists (ID: {$existingProduct->id})");
+            return response()->json([
+                'success' => true,
+                'message' => 'Product already exists',
+                'data' => $existingProduct,
+                'id' => $existingProduct->id,
+            ], 200);
+        }
+
         $product = Product::create([
             'bot_id' => $botId,
             'name' => $validated['name'],
