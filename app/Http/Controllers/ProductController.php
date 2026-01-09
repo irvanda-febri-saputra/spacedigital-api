@@ -29,7 +29,7 @@ class ProductController extends Controller
             $botIds = $user->bots()->pluck('id');
         }
 
-        $query = Product::whereIn('bot_id', $botIds)->with('bot:id,name');
+        $query = Product::whereIn('bot_id', $botIds)->with(['bot:id,name', 'productVariants']);
 
         // Filters
         if ($request->filled('bot_id')) {
@@ -63,7 +63,16 @@ class ProductController extends Controller
                 'stock_count' => $product->stock_count ?? 0,
                 'sold_count' => $product->sold_count ?? 0,
                 'category' => $product->category,
-                'variants' => is_string($product->variants) ? json_decode($product->variants, true) : ($product->variants ?? []),
+                // Use productVariants relationship if available, fallback to JSON column for old data
+                'variants' => $product->productVariants->count() > 0 
+                    ? $product->productVariants->map(fn($v) => [
+                        'id' => $v->id,
+                        'variant_code' => $v->variant_code,
+                        'name' => $v->name,
+                        'price' => $v->price,
+                        'stock_count' => $v->stock_count ?? 0,
+                    ])->toArray()
+                    : (is_string($product->variants) ? json_decode($product->variants, true) : ($product->variants ?? [])),
                 'image_url' => $product->image_url,
                 'is_active' => $product->is_active,
                 'sort_order' => $product->sort_order,
