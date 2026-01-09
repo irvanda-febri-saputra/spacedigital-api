@@ -110,9 +110,10 @@ class ProductController extends Controller
 
         $validated = $request->validate([
             'bot_id' => 'nullable|exists:bots,id',
+            'product_code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
             'stock' => 'integer|min:-1',
             'category' => 'nullable|string|max:100',
             'variants' => 'nullable|array',
@@ -155,9 +156,10 @@ class ProductController extends Controller
 
         $product = Product::create([
             'bot_id' => $botId,
+            'product_code' => $validated['product_code'] ?? null,
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
-            'price' => $validated['price'],
+            'price' => $validated['price'] ?? 0,
             'stock' => $validated['stock'] ?? -1,
             'category' => $validated['category'] ?? null,
             'variants' => $validated['variants'] ?? null,
