@@ -722,13 +722,31 @@ class BotApiController extends Controller
 
         foreach ($products as $productData) {
             try {
-                \App\Models\Product::updateOrCreate(
-                    [
+                $productName = $productData['name'] ?? 'Unknown';
+                
+                // Find by name (CASE-INSENSITIVE) to prevent duplicates
+                $existingProduct = \App\Models\Product::where('bot_id', $bot->id)
+                    ->whereRaw('LOWER(name) = ?', [strtolower($productName)])
+                    ->first();
+                
+                if ($existingProduct) {
+                    // UPDATE existing product
+                    $existingProduct->update([
+                        'bot_external_id' => $productData['id'] ?? $existingProduct->bot_external_id,
+                        'product_code' => $productData['product_code'] ?? $existingProduct->product_code,
+                        'price' => $productData['price'] ?? $existingProduct->price,
+                        'description' => $productData['description'] ?? $existingProduct->description,
+                        'category' => $productData['category'] ?? $existingProduct->category,
+                        'stock_count' => $productData['stock_count'] ?? $existingProduct->stock_count,
+                        'variants' => json_encode($productData['variants'] ?? []),
+                        'is_active' => $productData['is_active'] ?? true,
+                    ]);
+                } else {
+                    // CREATE new product only if not exists
+                    \App\Models\Product::create([
                         'bot_id' => $bot->id,
                         'bot_external_id' => $productData['id'] ?? null,
-                    ],
-                    [
-                        'name' => $productData['name'] ?? 'Unknown',
+                        'name' => $productName,
                         'product_code' => $productData['product_code'] ?? null,
                         'price' => $productData['price'] ?? 0,
                         'description' => $productData['description'] ?? null,
@@ -736,8 +754,8 @@ class BotApiController extends Controller
                         'stock_count' => $productData['stock_count'] ?? 0,
                         'variants' => json_encode($productData['variants'] ?? []),
                         'is_active' => $productData['is_active'] ?? true,
-                    ]
-                );
+                    ]);
+                }
                 $synced++;
             } catch (\Exception $e) {
                 Log::warning("Product sync failed: " . $e->getMessage());
