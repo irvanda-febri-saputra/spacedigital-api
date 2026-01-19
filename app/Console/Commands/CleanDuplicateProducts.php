@@ -14,13 +14,13 @@ class CleanDuplicateProducts extends Command
     public function handle()
     {
         $dryRun = $this->option('dry-run');
-        
+
         $this->info('Finding duplicate products...');
-        
+
         // Find duplicates grouped by bot_id and lowercase name
         $duplicates = DB::select("
             SELECT bot_id, LOWER(name) as name_lower, COUNT(*) as cnt, GROUP_CONCAT(id) as ids
-            FROM products 
+            FROM products
             GROUP BY bot_id, LOWER(name)
             HAVING COUNT(*) > 1
         ");
@@ -31,24 +31,24 @@ class CleanDuplicateProducts extends Command
         }
 
         $this->info("Found " . count($duplicates) . " duplicate groups");
-        
+
         $deletedCount = 0;
 
         foreach ($duplicates as $dup) {
             $ids = explode(',', $dup->ids);
-            
+
             // Get all products in this duplicate group
             $products = Product::whereIn('id', $ids)->get();
-            
+
             $this->line("\n📦 Duplicate group: '{$dup->name_lower}' (Bot ID: {$dup->bot_id})");
-            
+
             // Find the "best" one to keep (prefer one with product_code)
             $keep = null;
             $toDelete = [];
-            
+
             foreach ($products as $product) {
                 $this->line("  - ID: {$product->id} | Code: " . ($product->product_code ?: 'NULL') . " | Name: {$product->name}");
-                
+
                 if (!$keep) {
                     $keep = $product;
                 } else {
@@ -61,27 +61,27 @@ class CleanDuplicateProducts extends Command
                     }
                 }
             }
-            
+
             $this->info("  ✅ KEEP: ID {$keep->id} ({$keep->name})");
-            
+
             foreach ($toDelete as $product) {
                 $this->warn("  ❌ DELETE: ID {$product->id} ({$product->name})");
-                
+
                 if (!$dryRun) {
                     // Move any stock items to the kept product
                     $stockMoved = DB::table('stock_items')
                         ->where('product_id', $product->id)
                         ->update(['product_id' => $keep->id]);
-                    
+
                     if ($stockMoved > 0) {
                         $this->line("     → Moved {$stockMoved} stock items to kept product");
                     }
-                    
+
                     // Move variants if any
                     DB::table('product_variants')
                         ->where('product_id', $product->id)
                         ->update(['product_id' => $keep->id]);
-                    
+
                     // Delete the duplicate
                     $product->delete();
                     $deletedCount++;

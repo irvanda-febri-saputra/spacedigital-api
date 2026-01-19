@@ -51,33 +51,45 @@ class ProductController extends Controller
 
         $products = $query->orderBy('sort_order')->orderBy('name')
             ->paginate($request->get('per_page', 20))
-            ->through(fn ($product) => [
-                'id' => $product->id,
-                'bot_id' => $product->bot_id,
-                'bot' => $product->bot ? ['id' => $product->bot->id, 'name' => $product->bot->name] : null,
-                'product_code' => $product->product_code,
-                'name' => $product->name,
-                'description' => $product->description,
-                'price' => $product->price,
-                'stock' => $product->stock,
-                'stock_count' => $product->stock_count ?? 0,
-                'sold_count' => $product->sold_count ?? 0,
-                'category' => $product->category,
-                // Use productVariants relationship if available, fallback to JSON column for old data
-                'variants' => $product->productVariants->count() > 0
-                    ? $product->productVariants->map(fn($v) => [
-                        'id' => $v->id,
-                        'variant_code' => $v->variant_code,
-                        'name' => $v->name,
-                        'price' => $v->price,
-                        'stock_count' => $v->stock_count ?? 0,
-                    ])->toArray()
-                    : (is_string($product->variants) ? json_decode($product->variants, true) : ($product->variants ?? [])),
-                'image_url' => $product->image_url,
-                'is_active' => $product->is_active,
-                'sort_order' => $product->sort_order,
-                'created_at' => $product->created_at->toIso8601String(),
-            ]);
+            ->through(function ($product) {
+                // Calculate REAL stock count from stock_items table
+                $realStockCount = \App\Models\StockItem::where('product_id', $product->id)
+                    ->where('is_sold', false)
+                    ->count();
+                
+                return [
+                    'id' => $product->id,
+                    'bot_id' => $product->bot_id,
+                    'bot' => $product->bot ? ['id' => $product->bot->id, 'name' => $product->bot->name] : null,
+                    'product_code' => $product->product_code,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'stock' => $realStockCount,
+                    'stock_count' => $realStockCount,
+                    'sold_count' => $product->sold_count ?? 0,
+                    'category' => $product->category,
+                    // Use productVariants relationship if available, fallback to JSON column for old data
+                    'variants' => $product->productVariants->count() > 0
+                        ? $product->productVariants->map(function($v) {
+                            // Calculate real stock for each variant
+                            $variantStock = \App\Models\StockItem::where('variant_id', $v->id)
+                                ->where('is_sold', false)
+                                ->count();
+                            return [
+                                'id' => $v->id,
+                                'variant_code' => $v->variant_code,
+                                'name' => $v->name,
+                                'price' => $v->price,
+                                'stock_count' => $variantStock,
+                            ];
+                        })->toArray()
+                        : (is_string($product->variants) ? json_decode($product->variants, true) : ($product->variants ?? [])),
+                    'image_url' => $product->image_url,
+                    'is_active' => $product->is_active,
+                    'sort_order' => $product->sort_order,
+                    'created_at' => $product->created_at->toIso8601String(),
+                ];
 
         return response()->json($products);
     }
