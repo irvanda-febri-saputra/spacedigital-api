@@ -773,26 +773,35 @@ class BotApiController extends Controller
         try {
             if ($action === 'delete') {
                 \App\Models\Product::where('bot_id', $bot->id)
-                    ->where('name', $productData['name'])
+                    ->whereRaw('LOWER(name) = ?', [strtolower($productData['name'])])
                     ->delete();
             } else {
-                // Find by name, not bot_external_id (which is always null/wrong)
-                $product = \App\Models\Product::updateOrCreate(
-                    [
+                // Find by name (CASE-INSENSITIVE) to prevent duplicates
+                $product = \App\Models\Product::where('bot_id', $bot->id)
+                    ->whereRaw('LOWER(name) = ?', [strtolower($productData['name'])])
+                    ->first();
+
+                $data = [
+                    'product_code' => $productData['product_code'] ?? null,
+                    'price' => $productData['price'] ?? 0,
+                    'description' => $productData['description'] ?? null,
+                    'category' => $productData['category'] ?? null,
+                    'stock' => $productData['stock_count'] ?? 0,
+                    'stock_count' => $productData['stock_count'] ?? 0,
+                    'variants' => json_encode($productData['variants'] ?? []),
+                    'is_active' => $productData['is_active'] ?? true,
+                ];
+
+                if ($product) {
+                    // Update existing product
+                    $product->update($data);
+                } else {
+                    // Create new product
+                    $product = \App\Models\Product::create(array_merge($data, [
                         'bot_id' => $bot->id,
-                        'name' => $productData['name'], // Search by NAME, not ID
-                    ],
-                    [
-                        'product_code' => $productData['product_code'] ?? null,
-                        'price' => $productData['price'] ?? 0,
-                        'description' => $productData['description'] ?? null,
-                        'category' => $productData['category'] ?? null,
-                        'stock' => $productData['stock_count'] ?? 0, // Update stock field
-                        'stock_count' => $productData['stock_count'] ?? 0, // And stock_count
-                        'variants' => json_encode($productData['variants'] ?? []),
-                        'is_active' => $productData['is_active'] ?? true,
-                    ]
-                );
+                        'name' => $productData['name'],
+                    ]));
+                }
                 
                 \Log::info("Product synced from bot: {$product->name}, stock: {$product->stock}");
             }
@@ -830,9 +839,9 @@ class BotApiController extends Controller
         ]);
 
         try {
-            // Find product by name - DO NOT create if not exists
+            // Find product by name (CASE-INSENSITIVE) - DO NOT create if not exists
             $product = \App\Models\Product::where('bot_id', $bot->id)
-                ->where('name', $validated['name'])
+                ->whereRaw('LOWER(name) = ?', [strtolower($validated['name'])])
                 ->first();
 
             if (!$product) {

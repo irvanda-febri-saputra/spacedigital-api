@@ -147,9 +147,9 @@ class ProductController extends Controller
             return response()->json(['error' => 'Unauthorized - not your bot'], 403);
         }
 
-        // Check for duplicate product name in same bot
+        // Check for duplicate product name in same bot (CASE-INSENSITIVE)
         $existingProduct = Product::where('bot_id', $botId)
-            ->where('name', $validated['name'])
+            ->whereRaw('LOWER(name) = ?', [strtolower($validated['name'])])
             ->first();
         
         if ($existingProduct) {
