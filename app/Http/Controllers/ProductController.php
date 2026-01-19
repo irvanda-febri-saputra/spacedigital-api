@@ -427,6 +427,8 @@ class ProductController extends Controller
         }
 
         $bot = $product->bot;
+        $productName = $product->name;
+        $productCode = $product->product_code;
         $productId = $product->bot_external_id;
 
         // Delete product
@@ -443,6 +445,8 @@ class ProductController extends Controller
                 'event' => 'product.deleted',
                 'data' => [
                     'product_id' => $productId,
+                    'name' => $productName,
+                    'product_code' => $productCode,
                     'timestamp' => now()->toIso8601String()
                 ]
             ]);
