@@ -34,7 +34,7 @@ Route::prefix('bot')
         Route::post('/products/sync', [BotApiController::class, 'syncProducts']);
         Route::post('/products/sync-single', [BotApiController::class, 'syncProductSingle']);
         Route::post('/products/update-stock', [BotApiController::class, 'updateProductStock']);
-        
+
         // Stock sold notification (Bot notifies when stock is sold)
         Route::post('/stocks/sold', [BotApiController::class, 'markStocksSold']);
     });
@@ -149,10 +149,11 @@ Route::middleware('auth.api.token')->prefix('dashboard')->group(function () {
     Route::delete('/stocks/{stock}', [\App\Http\Controllers\StockController::class, 'apiDestroy']);
     Route::post('/stocks/bulk-import', [\App\Http\Controllers\StockController::class, 'apiBulkImport']);
     Route::get('/stocks/stats', [\App\Http\Controllers\StockController::class, 'apiStats']);
+    Route::post('/stocks/hastebin', [\App\Http\Controllers\StockController::class, 'apiGenerateHastebin']);
 
     // Broadcast
     Route::post('/broadcast', [\App\Http\Controllers\BroadcastController::class, 'send']);
-    
+
     // Image Upload (Catbox proxy)
     Route::post('/upload-image', [\App\Http\Controllers\ImageUploadController::class, 'uploadToCatbox']);
 

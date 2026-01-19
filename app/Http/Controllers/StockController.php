@@ -17,7 +17,7 @@ class StockController extends Controller
     public function apiIndex(Request $request)
     {
         $user = $request->user();
-        
+
         // Get user's bot IDs
         if ($user->isSuperAdmin()) {
             $productIds = Product::pluck('id');
@@ -284,6 +284,46 @@ class StockController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::warning("Failed to broadcast stock delete: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate Hastebin link from text
+     */
+    public function apiGenerateHastebin(Request $request)
+    {
+        $validated = $request->validate([
+            'text' => 'required|string',
+        ]);
+
+        $hastebinUrl = env('HASTEBIN_URL', 'https://sumini.prabowo23.my.id');
+
+        try {
+            $response = Http::timeout(10)
+                ->withHeaders(['Content-Type' => 'text/plain'])
+                ->withBody($validated['text'], 'text/plain')
+                ->post("{$hastebinUrl}/documents");
+
+            if ($response->successful() && $response->json('key')) {
+                $key = $response->json('key');
+                return response()->json([
+                    'success' => true,
+                    'url' => "{$hastebinUrl}/{$key}",
+                    'key' => $key,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate hastebin link',
+            ], 500);
+
+        } catch (\Exception $e) {
+            Log::error("Hastebin error: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Hastebin service unavailable',
+            ], 500);
         }
     }
 }
