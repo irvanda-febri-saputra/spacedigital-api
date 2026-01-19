@@ -90,6 +90,7 @@ class ProductController extends Controller
                     'sort_order' => $product->sort_order,
                     'created_at' => $product->created_at->toIso8601String(),
                 ];
+            });
 
         return response()->json($products);
     }
