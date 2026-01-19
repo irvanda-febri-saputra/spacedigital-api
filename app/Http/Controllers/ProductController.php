@@ -64,7 +64,7 @@ class ProductController extends Controller
                 'sold_count' => $product->sold_count ?? 0,
                 'category' => $product->category,
                 // Use productVariants relationship if available, fallback to JSON column for old data
-                'variants' => $product->productVariants->count() > 0 
+                'variants' => $product->productVariants->count() > 0
                     ? $product->productVariants->map(fn($v) => [
                         'id' => $v->id,
                         'variant_code' => $v->variant_code,
@@ -151,7 +151,7 @@ class ProductController extends Controller
         $existingProduct = Product::where('bot_id', $botId)
             ->whereRaw('LOWER(name) = ?', [strtolower($validated['name'])])
             ->first();
-        
+
         if ($existingProduct) {
             // Return existing product instead of creating duplicate
             Log::info("Product '{$validated['name']}' already exists (ID: {$existingProduct->id})");
@@ -181,15 +181,15 @@ class ProductController extends Controller
         try {
             $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
             $wsSecret = env('WS_BROADCAST_SECRET');
-            
+
             // Parse variants if it's JSON string
             $variants = [];
             if ($product->variants) {
-                $variants = is_string($product->variants) 
-                    ? json_decode($product->variants, true) 
+                $variants = is_string($product->variants)
+                    ? json_decode($product->variants, true)
                     : $product->variants;
             }
-            
+
             $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
                 'channel' => "bot.{$bot->id}",
@@ -205,7 +205,7 @@ class ProductController extends Controller
                     'timestamp' => now()->toIso8601String()
                 ]
             ]);
-            
+
             if ($response->successful()) {
                 $result = $response->json();
                 Log::info("Product creation broadcasted to {$result['clients']} bot(s) for product {$product->id}");
@@ -255,15 +255,15 @@ class ProductController extends Controller
             $bot = $product->bot;
             $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
             $wsSecret = env('WS_BROADCAST_SECRET');
-            
+
             // Parse variants if it's JSON string
             $variants = [];
             if ($product->variants) {
-                $variants = is_string($product->variants) 
-                    ? json_decode($product->variants, true) 
+                $variants = is_string($product->variants)
+                    ? json_decode($product->variants, true)
                     : $product->variants;
             }
-            
+
             $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
                 'channel' => "bot.{$bot->id}",
@@ -279,7 +279,7 @@ class ProductController extends Controller
                     'timestamp' => now()->toIso8601String()
                 ]
             ]);
-            
+
             if ($response->successful()) {
                 $result = $response->json();
                 Log::info("Product update broadcasted to {$result['clients']} bot(s) for product {$product->id}");
@@ -320,14 +320,14 @@ class ProductController extends Controller
 
         // Resolve variant code if only ID provided
         $variantCode = $validated['variant_code'] ?? null;
-        
+
         // If code matches empty string, set to null
         if ($variantCode === '') $variantCode = null;
 
         if (empty($variantCode) && !empty($validated['variant_id'])) {
              // Parse variants from product (could be JSON string or array)
              $variants = is_string($product->variants) ? json_decode($product->variants, true) : $product->variants;
-             
+
              if (is_array($variants)) {
                  foreach ($variants as $v) {
                      // Robust comparison: ID, Name, or Code
@@ -339,23 +339,23 @@ class ProductController extends Controller
                      if ($input === $vId || $input === $vName || $input === $vCode) {
                          $variantCode = $v['variant_code'] ?? null;
                          // fallback to name if code missing
-                         if (!$variantCode) $variantCode = $v['name'] ?? null; 
+                         if (!$variantCode) $variantCode = $v['name'] ?? null;
                          break;
                      }
                  }
              }
         }
-        
+
         \Log::info("Resolved Variant Code: " . ($variantCode ?? 'NULL'));
 
     // Broadcast stock add via WebSocket (real-time to all bots)
     try {
         $bot = $product->bot;
-        
+
         // Broadcast via WebSocket Hub
         $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
         $wsSecret = env('WS_BROADCAST_SECRET');
-        
+
         $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
             'secret' => $wsSecret,
             'channel' => "bot.{$bot->id}",
@@ -367,19 +367,19 @@ class ProductController extends Controller
                 'timestamp' => now()->toIso8601String()
             ]
         ]);
-        
+
         if ($response->successful()) {
             $result = $response->json();
             Log::info("Stock add broadcasted to {$result['clients']} bot(s) for product {$product->id}");
-            
+
             // Count stock items added - normalize line endings (browser sends \r\n)
             $normalizedData = str_replace("\r\n", "\n", $validated['stock_data']);
             $stockLines = array_filter(explode("\n", $normalizedData));
             $stockCount = count($stockLines);
-            
+
             // Update stock_count in Laravel for immediate dashboard refresh
             $product->increment('stock', $stockCount);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Stock ditambahkan! Bot akan sync dalam beberapa detik.',
@@ -393,7 +393,7 @@ class ProductController extends Controller
     } catch (\Exception $e) {
         Log::warning("Failed to broadcast stock add: " . $e->getMessage());
     }
-    
+
     // Fallback response if broadcast fails
     return response()->json([
         'success' => true,
@@ -423,7 +423,7 @@ class ProductController extends Controller
         try {
             $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
             $wsSecret = env('WS_BROADCAST_SECRET');
-            
+
             $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
                 'channel' => "bot.{$bot->id}",
@@ -433,7 +433,7 @@ class ProductController extends Controller
                     'timestamp' => now()->toIso8601String()
                 ]
             ]);
-            
+
             if ($response->successful()) {
                 $result = $response->json();
                 Log::info("Product delete broadcasted to {$result['clients']} bot(s)");
@@ -520,7 +520,7 @@ class ProductController extends Controller
             // Find product by bot's internal ID is not reliable
             // Find by name instead (unique per bot)
             $botId = $request->header('X-Bot-Id'); // Assuming bot sends its ID
-            
+
             if (!$botId) {
                 // Fallback: find by name only (assuming unique names)
                 $product = Product::where('name', $validated['name'])->first();

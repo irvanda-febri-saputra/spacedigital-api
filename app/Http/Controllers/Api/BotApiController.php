@@ -707,7 +707,7 @@ class BotApiController extends Controller
     /**
      * Sync products from bot to dashboard
      * Bot pushes its products here, dashboard stores them
-     * 
+     *
      * Usage: POST /api/bot/products/sync
      */
     public function syncProducts(Request $request)
@@ -753,7 +753,7 @@ class BotApiController extends Controller
 
     /**
      * Sync single product change (create/update/delete)
-     * 
+     *
      * Usage: POST /api/bot/products/sync-single
      */
     public function syncProductSingle(Request $request)
@@ -802,7 +802,7 @@ class BotApiController extends Controller
                         'name' => $productData['name'],
                     ]));
                 }
-                
+
                 \Log::info("Product synced from bot: {$product->name}, stock: {$product->stock}");
             }
 
@@ -819,7 +819,7 @@ class BotApiController extends Controller
     /**
      * Update product stock count ONLY (no product creation)
      * This prevents duplicate products when syncing from bot
-     * 
+     *
      * Usage: POST /api/bot/products/update-stock
      */
     public function updateProductStock(Request $request)
@@ -877,17 +877,17 @@ class BotApiController extends Controller
                         // Normalize names for comparison (trim + lowercase)
                         $currName = trim(strtolower($key['name'] ?? ''));
                         $newName = trim(strtolower($newVariant['name'] ?? ''));
-                        
+
                         // Strict code match (case-insensitive) OR loose name match
-                        $matchByCode = !empty($newVariant['variant_code']) && 
+                        $matchByCode = !empty($newVariant['variant_code']) &&
                                       strtolower($key['variant_code'] ?? '') === strtolower($newVariant['variant_code']);
-                        
+
                         $matchByName = $currName === $newName;
 
                         if ($matchByCode || $matchByName) {
                             $oldStock = $key['stock_count'] ?? 0;
                             $newStock = $newVariant['stock_count'];
-                            
+
                             $key['stock_count'] = $newStock;
                             // Also update 'stock' if it exists in variant structure
                             if (isset($key['stock'])) {
@@ -895,7 +895,7 @@ class BotApiController extends Controller
                             }
                             $updated = true;
                             $found = true;
-                            
+
                             \Log::info("Variant matched: updated '{$key['name']}' stock {$oldStock} -> {$newStock}");
                             break;
                         }
@@ -930,7 +930,7 @@ class BotApiController extends Controller
 
     /**
      * Mark stocks as sold (called by bot when items are sold)
-     * 
+     *
      * Usage: POST /api/bot/stocks/sold
      * Body: { stock_ids: [1,2,3], trx_id: "...", telegram_id: "..." }
      */
