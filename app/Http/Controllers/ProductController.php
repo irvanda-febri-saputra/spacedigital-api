@@ -86,6 +86,7 @@ class ProductController extends Controller
                                 'variant_code' => $v->variant_code,
                                 'name' => $v->name,
                                 'price' => $v->price,
+                                'terms' => $v->terms,
                                 'stock_count' => $variantStock,
                             ];
                         })->toArray()
@@ -112,6 +113,28 @@ class ProductController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        // Calculate real stock counts
+        $realStockCount = \App\Models\StockItem::where('product_id', $product->id)
+            ->where('is_sold', false)
+            ->count();
+
+        // Use productVariants relationship consistently (same as apiIndex)
+        $variants = $product->productVariants->count() > 0
+            ? $product->productVariants->map(function($v) {
+                $variantStock = \App\Models\StockItem::where('variant_id', $v->id)
+                    ->where('is_sold', false)
+                    ->count();
+                return [
+                    'id' => $v->id,
+                    'variant_code' => $v->variant_code,
+                    'name' => $v->name,
+                    'price' => $v->price,
+                    'terms' => $v->terms,
+                    'stock_count' => $variantStock,
+                ];
+            })->toArray()
+            : (is_string($product->variants) ? json_decode($product->variants, true) : ($product->variants ?? []));
+
         return response()->json([
             'id' => $product->id,
             'bot_id' => $product->bot_id,
@@ -119,9 +142,10 @@ class ProductController extends Controller
             'name' => $product->name,
             'description' => $product->description,
             'price' => $product->price,
-            'stock' => $product->stock,
+            'stock' => $realStockCount,
+            'stock_count' => $realStockCount,
             'category' => $product->category,
-            'variants' => $product->variants,
+            'variants' => $variants,
             'image_url' => $product->image_url,
             'is_active' => $product->is_active,
             'sort_order' => $product->sort_order,
