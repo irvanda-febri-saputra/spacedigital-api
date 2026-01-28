@@ -286,26 +286,89 @@ class ProductController extends Controller
             'category' => 'nullable|string|max:100',
             'terms' => 'nullable|string',
             'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable|integer',
+            'variants.*.name' => 'required|string',
+            'variants.*.variant_code' => 'nullable|string',
+            'variants.*.price' => 'nullable|numeric',
+            'variants.*.terms' => 'nullable|string',
             'image_url' => 'nullable|url|max:500',
             'is_active' => 'sometimes|boolean',
             'sort_order' => 'sometimes|integer|min:0',
         ]);
 
+        // Separate variants from product data
+        $variantsData = $validated['variants'] ?? null;
+        unset($validated['variants']);
+        
+        // Update product (without variants field)
         $product->update($validated);
 
-        // Broadcast product update via WebSocket (includes variants)
+        // Sync variants to product_variants table
+        if ($variantsData && is_array($variantsData)) {
+            foreach ($variantsData as $variantInput) {
+                if (!empty($variantInput['id'])) {
+                    // Update existing variant by ID
+                    $variant = \App\Models\ProductVariant::find($variantInput['id']);
+                    if ($variant && $variant->product_id === $product->id) {
+                        $variant->update([
+                            'name' => $variantInput['name'],
+                            'variant_code' => $variantInput['variant_code'] ?? $variant->variant_code,
+                            'price' => $variantInput['price'] ?? $variant->price,
+                            'terms' => $variantInput['terms'] ?? null,
+                        ]);
+                        Log::info("Updated variant {$variant->id}: {$variant->name} price={$variant->price}");
+                    }
+                } else {
+                    // Try to find by name/code or create new
+                    $variant = $product->productVariants()
+                        ->where(function($q) use ($variantInput) {
+                            $q->whereRaw('LOWER(name) = ?', [strtolower($variantInput['name'])])
+                              ->orWhereRaw('LOWER(variant_code) = ?', [strtolower($variantInput['variant_code'] ?? '')]);
+                        })
+                        ->first();
+                    
+                    if ($variant) {
+                        $variant->update([
+                            'name' => $variantInput['name'],
+                            'variant_code' => $variantInput['variant_code'] ?? $variant->variant_code,
+                            'price' => $variantInput['price'] ?? $variant->price,
+                            'terms' => $variantInput['terms'] ?? null,
+                        ]);
+                        Log::info("Updated variant by name {$variant->id}: {$variant->name}");
+                    } else {
+                        // Create new variant
+                        $variant = $product->productVariants()->create([
+                            'name' => $variantInput['name'],
+                            'variant_code' => $variantInput['variant_code'] ?? strtoupper(str_replace(' ', '_', $variantInput['name'])),
+                            'price' => $variantInput['price'] ?? 0,
+                            'terms' => $variantInput['terms'] ?? null,
+                            'is_active' => true,
+                        ]);
+                        Log::info("Created new variant {$variant->id}: {$variant->name}");
+                    }
+                }
+            }
+        }
+
+        // Reload product with fresh variants
+        $product->load('productVariants');
+
+        // Broadcast product update via WebSocket (includes variants from relationship)
         try {
             $bot = $product->bot;
             $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
             $wsSecret = env('WS_BROADCAST_SECRET');
 
-            // Parse variants if it's JSON string
-            $variants = [];
-            if ($product->variants) {
-                $variants = is_string($product->variants)
-                    ? json_decode($product->variants, true)
-                    : $product->variants;
-            }
+            // Get variants from productVariants relationship (not JSON column)
+            $variants = $product->productVariants->map(function($v) {
+                return [
+                    'id' => $v->id,
+                    'variant_code' => $v->variant_code,
+                    'name' => $v->name,
+                    'price' => $v->price,
+                    'terms' => $v->terms,
+                ];
+            })->toArray();
 
             $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
