@@ -193,12 +193,39 @@ class BotApiController extends Controller
 
         if ($result['success']) {
             // Save transaction to database for webhook matching
+            // Use the product_name from request - bot sends this with actual product name
+            $productName = $validated['product_name'] ?? null;
+            
             try {
-                \App\Models\Transaction::updateOrCreate(
-                    ['order_id' => $validated['order_id']],
-                    [
+                // Check if transaction already exists
+                $existingTransaction = \App\Models\Transaction::where('order_id', $validated['order_id'])->first();
+                
+                if ($existingTransaction) {
+                    // Update existing - only update product_name if new value is provided and not empty
+                    $updateData = [
                         'bot_id' => $bot->id,
-                        'product_name' => $validated['product_name'] ?? 'Pending Payment',
+                        'variant' => $validated['variant'] ?? $existingTransaction->variant,
+                        'telegram_username' => $validated['customer_name'] ?? $existingTransaction->telegram_username,
+                        'total_price' => $validated['amount'],
+                        'price' => $validated['amount'],
+                        'status' => 'pending',
+                        'payment_ref' => $result['payment_id'] ?? $validated['order_id'],
+                        'payment_gateway' => $result['gateway_code'] ?? 'unknown',
+                        'expired_at' => now()->addMinutes(15),
+                    ];
+                    
+                    // Only update product_name if provided and not "Pending Payment"
+                    if ($productName && $productName !== 'Pending Payment') {
+                        $updateData['product_name'] = $productName;
+                    }
+                    
+                    $existingTransaction->update($updateData);
+                } else {
+                    // Create new - use actual product name or fallback
+                    \App\Models\Transaction::create([
+                        'order_id' => $validated['order_id'],
+                        'bot_id' => $bot->id,
+                        'product_name' => $productName ?: 'Unknown Product',
                         'variant' => $validated['variant'] ?? null,
                         'telegram_username' => $validated['customer_name'] ?? null,
                         'total_price' => $validated['amount'],
@@ -207,8 +234,8 @@ class BotApiController extends Controller
                         'payment_ref' => $result['payment_id'] ?? $validated['order_id'],
                         'payment_gateway' => $result['gateway_code'] ?? 'unknown',
                         'expired_at' => now()->addMinutes(15),
-                    ]
-                );
+                    ]);
+                }
             } catch (\Exception $e) {
                 \Log::error('Transaction save error: ' . $e->getMessage());
                 // Continue even if save fails - payment was still created
