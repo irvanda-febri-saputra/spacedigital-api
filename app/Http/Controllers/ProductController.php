@@ -56,7 +56,7 @@ class ProductController extends Controller
                 $realStockCount = \App\Models\StockItem::where('product_id', $product->id)
                     ->where('is_sold', false)
                     ->count();
-                
+
                 // Calculate REAL sold count from stock_items table
                 $realSoldCount = \App\Models\StockItem::where('product_id', $product->id)
                     ->where('is_sold', true)
@@ -260,6 +260,7 @@ class ProductController extends Controller
             'price' => 'sometimes|numeric|min:0',
             'stock' => 'sometimes|integer|min:-1',
             'category' => 'nullable|string|max:100',
+            'terms' => 'nullable|string',
             'variants' => 'nullable|array',
             'image_url' => 'nullable|url|max:500',
             'is_active' => 'sometimes|boolean',
@@ -292,6 +293,7 @@ class ProductController extends Controller
                     'description' => $product->description,
                     'price' => $product->price,
                     'category' => $product->category,
+                    'terms' => $product->terms,
                     'is_active' => $product->is_active,
                     'variants' => $variants,
                     'timestamp' => now()->toIso8601String()
