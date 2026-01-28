@@ -811,6 +811,7 @@ class BotApiController extends Controller
                     'stock_count' => $productData['stock_count'] ?? 0,
                     'variants' => json_encode($productData['variants'] ?? []),
                     'is_active' => $productData['is_active'] ?? true,
+                    'bot_external_id' => $productData['id'] ?? null, // Store bot's product ID
                 ];
 
                 if ($product) {
