@@ -57,6 +57,11 @@ class ProductController extends Controller
                     ->where('is_sold', false)
                     ->count();
                 
+                // Calculate REAL sold count from stock_items table
+                $realSoldCount = \App\Models\StockItem::where('product_id', $product->id)
+                    ->where('is_sold', true)
+                    ->count();
+
                 return [
                     'id' => $product->id,
                     'bot_id' => $product->bot_id,
@@ -67,7 +72,7 @@ class ProductController extends Controller
                     'price' => $product->price,
                     'stock' => $realStockCount,
                     'stock_count' => $realStockCount,
-                    'sold_count' => $product->sold_count ?? 0,
+                    'sold_count' => $realSoldCount,
                     'category' => $product->category,
                     // Use productVariants relationship if available, fallback to JSON column for old data
                     'variants' => $product->productVariants->count() > 0

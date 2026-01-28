@@ -181,6 +181,8 @@ class BotApiController extends Controller
             'amount' => 'required|integer|min:1',
             'order_id' => 'required|string',
             'customer_name' => 'nullable|string',
+            'product_name' => 'nullable|string',
+            'variant' => 'nullable|string',
         ]);
 
         $result = $this->paymentService->createPayment($bot, [
@@ -196,7 +198,8 @@ class BotApiController extends Controller
                     ['order_id' => $validated['order_id']],
                     [
                         'bot_id' => $bot->id,
-                        'product_name' => 'Pending Payment', // Placeholder, will be updated by syncPaymentCreated
+                        'product_name' => $validated['product_name'] ?? 'Pending Payment',
+                        'variant' => $validated['variant'] ?? null,
                         'telegram_username' => $validated['customer_name'] ?? null,
                         'total_price' => $validated['amount'],
                         'price' => $validated['amount'],
@@ -723,12 +726,12 @@ class BotApiController extends Controller
         foreach ($products as $productData) {
             try {
                 $productName = $productData['name'] ?? 'Unknown';
-                
+
                 // Find by name (CASE-INSENSITIVE) to prevent duplicates
                 $existingProduct = \App\Models\Product::where('bot_id', $bot->id)
                     ->whereRaw('LOWER(name) = ?', [strtolower($productName)])
                     ->first();
-                
+
                 if ($existingProduct) {
                     // UPDATE existing product
                     $existingProduct->update([
