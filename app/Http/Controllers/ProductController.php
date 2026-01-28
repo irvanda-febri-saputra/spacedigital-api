@@ -299,7 +299,7 @@ class ProductController extends Controller
         // Separate variants from product data
         $variantsData = $validated['variants'] ?? null;
         unset($validated['variants']);
-        
+
         // Update product (without variants field)
         $product->update($validated);
 
@@ -326,7 +326,7 @@ class ProductController extends Controller
                               ->orWhereRaw('LOWER(variant_code) = ?', [strtolower($variantInput['variant_code'] ?? '')]);
                         })
                         ->first();
-                    
+
                     if ($variant) {
                         $variant->update([
                             'name' => $variantInput['name'],

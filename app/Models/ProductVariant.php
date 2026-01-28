@@ -15,6 +15,7 @@ class ProductVariant extends Model
         'name',
         'price',
         'description',
+        'terms',
         'is_active',
         'sort_order',
     ];
