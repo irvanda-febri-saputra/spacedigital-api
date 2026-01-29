@@ -17,12 +17,10 @@ class ProductVariantController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        // Check ownership (semua user hanya bisa lihat variant dari bot miliknya)
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $variants = $product->productVariants()
@@ -45,12 +43,10 @@ class ProductVariantController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        // Check ownership (semua user hanya bisa buat variant untuk bot miliknya)
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $validated = $request->validate([
@@ -91,12 +87,10 @@ class ProductVariantController extends Controller
         $user = $request->user();
         $product = $variant->product;
 
-        // Check ownership
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        // Check ownership (semua user hanya bisa update variant dari bot miliknya)
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $validated = $request->validate([
@@ -128,12 +122,10 @@ class ProductVariantController extends Controller
         $user = $request->user();
         $product = $variant->product;
 
-        // Check ownership
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        // Check ownership (semua user hanya bisa hapus variant dari bot miliknya)
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $variantId = $variant->id;

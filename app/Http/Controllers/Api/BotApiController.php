@@ -195,11 +195,11 @@ class BotApiController extends Controller
             // Save transaction to database for webhook matching
             // Use the product_name from request - bot sends this with actual product name
             $productName = $validated['product_name'] ?? null;
-            
+
             try {
                 // Check if transaction already exists
                 $existingTransaction = \App\Models\Transaction::where('order_id', $validated['order_id'])->first();
-                
+
                 if ($existingTransaction) {
                     // Update existing - only update product_name if new value is provided and not empty
                     $updateData = [
@@ -213,12 +213,12 @@ class BotApiController extends Controller
                         'payment_gateway' => $result['gateway_code'] ?? 'unknown',
                         'expired_at' => now()->addMinutes(15),
                     ];
-                    
+
                     // Only update product_name if provided and not "Pending Payment"
                     if ($productName && $productName !== 'Pending Payment') {
                         $updateData['product_name'] = $productName;
                     }
-                    
+
                     $existingTransaction->update($updateData);
                 } else {
                     // Create new - use actual product name or fallback

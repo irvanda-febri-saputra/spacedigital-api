@@ -13,12 +13,8 @@ class TransactionController extends Controller
     {
         $user = $request->user();
 
-        // Get user's bot IDs (or all if super admin)
-        if ($user->isSuperAdmin()) {
-            $botIds = Bot::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-        }
+        // Semua user hanya lihat transaksi dari bot miliknya
+        $botIds = $user->bots()->pluck('id');
 
         // Build query with filters
         $query = Transaction::whereIn('bot_id', $botIds)
@@ -92,8 +88,8 @@ class TransactionController extends Controller
     {
         $user = request()->user();
 
-        // Authorization check
-        if (!$user->isSuperAdmin() && $transaction->bot->user_id !== $user->id) {
+        // Authorization check - semua user hanya bisa lihat transaksi dari bot miliknya
+        if ($transaction->bot->user_id !== $user->id) {
             abort(403);
         }
 
@@ -123,12 +119,8 @@ class TransactionController extends Controller
     {
         $user = $request->user();
 
-        // Get user's bot IDs (or all if super admin)
-        if ($user->isSuperAdmin()) {
-            $botIds = Bot::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-        }
+        // Semua user hanya export transaksi dari bot miliknya
+        $botIds = $user->bots()->pluck('id');
 
         // Build query with filters (same as index)
         $query = Transaction::whereIn('bot_id', $botIds)
@@ -223,12 +215,8 @@ class TransactionController extends Controller
     {
         $user = $request->user();
 
-        // Get user's bot IDs
-        if ($user->isSuperAdmin()) {
-            $botIds = Bot::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-        }
+        // Semua user hanya lihat transaksi dari bot miliknya
+        $botIds = $user->bots()->pluck('id');
 
         $query = Transaction::whereIn('bot_id', $botIds)->with('bot:id,name');
 
@@ -274,11 +262,8 @@ class TransactionController extends Controller
     {
         $user = $request->user();
 
-        if ($user->isSuperAdmin()) {
-            $botIds = Bot::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-        }
+        // Semua user hanya lihat statistik dari bot miliknya
+        $botIds = $user->bots()->pluck('id');
 
         $stats = [
             'total_transactions' => Transaction::whereIn('bot_id', $botIds)->count(),
@@ -318,7 +303,7 @@ class TransactionController extends Controller
 
         // Check if user owns this bot
         $bot = Bot::find($validated['bot_id']);
-        if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+        if ($bot->user_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

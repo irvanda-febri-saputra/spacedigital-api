@@ -18,13 +18,9 @@ class StockController extends Controller
     {
         $user = $request->user();
 
-        // Get user's bot IDs
-        if ($user->isSuperAdmin()) {
-            $productIds = Product::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-            $productIds = Product::whereIn('bot_id', $botIds)->pluck('id');
-        }
+        // Get user's bot IDs (semua user hanya lihat produk bot milik sendiri)
+        $botIds = $user->bots()->pluck('id');
+        $productIds = Product::whereIn('bot_id', $botIds)->pluck('id');
 
         $query = StockItem::whereIn('product_id', $productIds)
             ->with(['product:id,name,product_code', 'variant:id,name,variant_code,price']);
@@ -65,13 +61,11 @@ class StockController extends Controller
             'data' => 'required|string', // Can be multiline for bulk
         ]);
 
-        // Check ownership
+        // Check ownership (semua user harus punya akses ke bot produk ini)
         $product = Product::findOrFail($validated['product_id']);
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         // Parse multiline data
@@ -111,13 +105,11 @@ class StockController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
+        // Check ownership (semua user harus punya akses ke bot produk ini)
         $product = $stock->product;
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $validated = $request->validate([
@@ -141,13 +133,11 @@ class StockController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
+        // Check ownership (semua user harus punya akses ke bot produk ini)
         $product = $stock->product;
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $stock->delete();
@@ -175,13 +165,11 @@ class StockController extends Controller
             'items.*' => 'required|string',
         ]);
 
-        // Check ownership
+        // Check ownership (semua user harus punya akses ke bot produk ini)
         $product = Product::findOrFail($validated['product_id']);
-        if (!$user->isSuperAdmin()) {
-            $botIds = $user->bots()->pluck('id')->toArray();
-            if (!in_array($product->bot_id, $botIds)) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $createdItems = [];
@@ -212,12 +200,9 @@ class StockController extends Controller
     {
         $user = $request->user();
 
-        if ($user->isSuperAdmin()) {
-            $productIds = Product::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-            $productIds = Product::whereIn('bot_id', $botIds)->pluck('id');
-        }
+        // Semua user hanya lihat statistik produk dari bot miliknya
+        $botIds = $user->bots()->pluck('id');
+        $productIds = Product::whereIn('bot_id', $botIds)->pluck('id');
 
         $stats = [
             'total' => StockItem::whereIn('product_id', $productIds)->count(),

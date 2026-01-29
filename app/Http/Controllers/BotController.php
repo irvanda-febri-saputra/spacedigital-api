@@ -15,10 +15,8 @@ class BotController extends Controller
     {
         $user = $request->user();
 
-        // Super admin sees all bots, regular users see only their bots
-        $query = $user->isSuperAdmin()
-            ? Bot::with(['user', 'activeGateway.gateway'])
-            : $user->bots()->with(['activeGateway.gateway']);
+        // Semua user hanya lihat bot miliknya sendiri
+        $query = $user->bots()->with(['activeGateway.gateway']);
 
         $bots = $query->latest()->get()->map(function ($bot) {
             $activeGateway = $bot->activeGateway;
@@ -103,8 +101,8 @@ class BotController extends Controller
      */
     public function edit(Bot $bot)
     {
-        // Check authorization
-        if (!request()->user()->isSuperAdmin() && $bot->user_id !== request()->user()->id) {
+        // Check authorization (semua user hanya bisa edit bot miliknya)
+        if ($bot->user_id !== request()->user()->id) {
             abort(403);
         }
 
@@ -133,8 +131,8 @@ class BotController extends Controller
      */
     public function update(Request $request, Bot $bot)
     {
-        // Check authorization
-        if (!$request->user()->isSuperAdmin() && $bot->user_id !== $request->user()->id) {
+        // Check authorization (semua user hanya bisa update bot miliknya)
+        if ($bot->user_id !== $request->user()->id) {
             abort(403);
         }
 
@@ -163,8 +161,8 @@ class BotController extends Controller
      */
     public function destroy(Bot $bot)
     {
-        // Check authorization
-        if (!request()->user()->isSuperAdmin() && $bot->user_id !== request()->user()->id) {
+        // Check authorization (semua user hanya bisa hapus bot miliknya)
+        if ($bot->user_id !== request()->user()->id) {
             abort(403);
         }
 
@@ -184,9 +182,8 @@ class BotController extends Controller
     {
         $user = $request->user();
 
-        $query = $user->isSuperAdmin()
-            ? Bot::with(['user', 'activeGateway.gateway'])
-            : $user->bots()->with(['activeGateway.gateway']);
+        // Semua user hanya lihat bot miliknya sendiri
+        $query = $user->bots()->with(['activeGateway.gateway']);
 
         $bots = $query->withCount('transactions')
             ->withSum('transactions', 'total_price')
@@ -225,7 +222,8 @@ class BotController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+        // Semua user hanya bisa lihat bot miliknya
+        if ($bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -275,7 +273,8 @@ class BotController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+        // Semua user hanya bisa update bot miliknya
+        if ($bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -308,7 +307,8 @@ class BotController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+        // Semua user hanya bisa hapus bot miliknya
+        if ($bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 

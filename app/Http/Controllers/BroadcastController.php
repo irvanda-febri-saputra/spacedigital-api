@@ -23,9 +23,9 @@ class BroadcastController extends Controller
             'format' => 'nullable|in:HTML,Markdown',
         ]);
 
-        // Check bot ownership
+        // Check bot ownership (semua user hanya bisa broadcast ke bot miliknya)
         $bot = Bot::findOrFail($validated['bot_id']);
-        if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+        if ($bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 

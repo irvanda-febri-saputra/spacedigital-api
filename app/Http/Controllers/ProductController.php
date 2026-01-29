@@ -22,12 +22,8 @@ class ProductController extends Controller
     {
         $user = $request->user();
 
-        // Get user's bot IDs
-        if ($user->isSuperAdmin()) {
-            $botIds = Bot::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-        }
+        // Get user's bot IDs (semua user hanya lihat bot milik sendiri)
+        $botIds = $user->bots()->pluck('id');
 
         $query = Product::whereIn('bot_id', $botIds)->with(['bot:id,name', 'productVariants']);
 
@@ -108,8 +104,8 @@ class ProductController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
-        if (!$user->isSuperAdmin() && $product->bot->user_id !== $user->id) {
+        // Check ownership (semua user hanya bisa lihat produk dari bot miliknya)
+        if ($product->bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -183,9 +179,9 @@ class ProductController extends Controller
             $botId = $firstBot->id;
         }
 
-        // Check bot ownership
+        // Check bot ownership (semua user hanya bisa buat produk di bot miliknya)
         $bot = Bot::findOrFail($botId);
-        if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+        if ($bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized - not your bot'], 403);
         }
 
@@ -272,8 +268,8 @@ class ProductController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
-        if (!$user->isSuperAdmin() && $product->bot->user_id !== $user->id) {
+        // Check ownership (semua user hanya bisa update produk dari bot miliknya)
+        if ($product->bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -411,8 +407,8 @@ class ProductController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
-        if (!$user->isSuperAdmin() && $product->bot->user_id !== $user->id) {
+        // Check ownership (semua user hanya bisa tambah stock produk dari bot miliknya)
+        if ($product->bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -515,8 +511,8 @@ class ProductController extends Controller
     {
         $user = $request->user();
 
-        // Check ownership
-        if (!$user->isSuperAdmin() && $product->bot->user_id !== $user->id) {
+        // Check ownership (semua user hanya bisa hapus produk dari bot miliknya)
+        if ($product->bot->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -568,11 +564,8 @@ class ProductController extends Controller
     {
         $user = $request->user();
 
-        if ($user->isSuperAdmin()) {
-            $botIds = Bot::pluck('id');
-        } else {
-            $botIds = $user->bots()->pluck('id');
-        }
+        // Semua user hanya lihat kategori dari bot miliknya
+        $botIds = $user->bots()->pluck('id');
 
         $categories = Product::whereIn('bot_id', $botIds)
             ->whereNotNull('category')
@@ -598,8 +591,8 @@ class ProductController extends Controller
         foreach ($validated['products'] as $item) {
             $product = Product::find($item['id']);
 
-            // Check ownership
-            if (!$user->isSuperAdmin() && $product->bot->user_id !== $user->id) {
+            // Check ownership (semua user hanya bisa reorder produk dari bot miliknya)
+            if ($product->bot->user_id !== $user->id) {
                 continue;
             }
 
