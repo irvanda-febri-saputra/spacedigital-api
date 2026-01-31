@@ -128,11 +128,17 @@ class ProductVariantController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $variantId = $variant->id;
+        // Save variant data before deletion for broadcast
+        $variantData = [
+            'id' => $variant->id,
+            'variant_code' => $variant->variant_code,
+            'name' => $variant->name,
+        ];
+        
         $variant->delete();
 
         // Broadcast to bot
-        $this->broadcastVariantDeleted($product, $variantId);
+        $this->broadcastVariantDeleted($product, $variantData);
 
         return response()->json([
             'success' => true,
@@ -178,11 +184,14 @@ class ProductVariantController extends Controller
     /**
      * Broadcast variant deleted
      */
-    private function broadcastVariantDeleted(Product $product, $variantId)
+    private function broadcastVariantDeleted(Product $product, $variantData)
     {
         $this->broadcast($product, 'variant.deleted', [
             'product_id' => $product->id,
-            'variant_id' => $variantId,
+            'product_name' => $product->name,
+            'variant_id' => $variantData['id'],
+            'variant_code' => $variantData['variant_code'],
+            'variant_name' => $variantData['name'],
         ]);
     }
 

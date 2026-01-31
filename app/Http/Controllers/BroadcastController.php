@@ -35,7 +35,7 @@ class BroadcastController extends Controller
         try {
             $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
             $wsSecret = env('WS_BROADCAST_SECRET');
-            
+
             $response = Http::timeout(10)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
                 'channel' => "bot.{$bot->id}",
@@ -48,11 +48,11 @@ class BroadcastController extends Controller
                     'timestamp' => now()->toIso8601String()
                 ]
             ]);
-            
+
             if ($response->successful()) {
                 $result = $response->json();
                 Log::info("Broadcast sent to bot {$bot->id}: {$broadcastId}");
-                
+
                 return response()->json([
                     'success' => true,
                     'broadcast_id' => $broadcastId,
