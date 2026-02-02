@@ -42,8 +42,18 @@ class StockController extends Controller
             $query->where('data', 'like', '%' . $request->search . '%');
         }
 
+        // Support 'all' to get all stocks without pagination
+        $perPage = $request->get('per_page', 100); // Increased default from 20 to 100
+        if ($perPage === 'all' || $perPage === -1) {
+            $stocks = $query->orderBy('created_at', 'desc')->get();
+            return response()->json([
+                'data' => $stocks,
+                'total' => $stocks->count(),
+            ]);
+        }
+
         $stocks = $query->orderBy('created_at', 'desc')
-            ->paginate($request->get('per_page', 20));
+            ->paginate($perPage);
 
         return response()->json($stocks);
     }
