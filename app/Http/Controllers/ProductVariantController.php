@@ -134,7 +134,7 @@ class ProductVariantController extends Controller
             'variant_code' => $variant->variant_code,
             'name' => $variant->name,
         ];
-        
+
         $variant->delete();
 
         // Broadcast to bot

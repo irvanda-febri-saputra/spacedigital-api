@@ -45,8 +45,66 @@ class ProductController extends Controller
             $query->where('is_active', $request->boolean('is_active'));
         }
 
+        // Support 'all' to get all products without pagination
+        $perPage = $request->get('per_page', 100); // Increased default from 20 to 100
+        if ($perPage === 'all' || $perPage === -1) {
+            $products = $query->orderBy('sort_order')->orderBy('name')
+                ->get()
+                ->map(function ($product) {
+                // Calculate REAL stock count from stock_items table
+                $realStockCount = \App\Models\StockItem::where('product_id', $product->id)
+                    ->where('is_sold', false)
+                    ->count();
+
+                // Calculate REAL sold count from stock_items table
+                $realSoldCount = \App\Models\StockItem::where('product_id', $product->id)
+                    ->where('is_sold', true)
+                    ->count();
+
+                return [
+                    'id' => $product->id,
+                    'bot_id' => $product->bot_id,
+                    'bot' => $product->bot ? ['id' => $product->bot->id, 'name' => $product->bot->name] : null,
+                    'product_code' => $product->product_code,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'stock' => $realStockCount,
+                    'stock_count' => $realStockCount,
+                    'sold_count' => $realSoldCount,
+                    'category' => $product->category,
+                    // Use productVariants relationship if available, fallback to JSON column for old data
+                    'variants' => $product->productVariants->count() > 0
+                        ? $product->productVariants->map(function($v) {
+                            // Calculate real stock for each variant
+                            $variantStock = \App\Models\StockItem::where('variant_id', $v->id)
+                                ->where('is_sold', false)
+                                ->count();
+                            return [
+                                'id' => $v->id,
+                                'variant_code' => $v->variant_code,
+                                'name' => $v->name,
+                                'price' => $v->price,
+                                'terms' => $v->terms,
+                                'stock_count' => $variantStock,
+                            ];
+                        })->toArray()
+                        : (is_string($product->variants) ? json_decode($product->variants, true) : ($product->variants ?? [])),
+                    'image_url' => $product->image_url,
+                    'is_active' => $product->is_active,
+                    'sort_order' => $product->sort_order,
+                    'created_at' => $product->created_at->toIso8601String(),
+                ];
+            });
+            return response()->json([
+                'data' => $products,
+                'total' => $products->count(),
+            ]);
+        }
+
+        // Paginated response
         $products = $query->orderBy('sort_order')->orderBy('name')
-            ->paginate($request->get('per_page', 20))
+            ->paginate($perPage)
             ->through(function ($product) {
                 // Calculate REAL stock count from stock_items table
                 $realStockCount = \App\Models\StockItem::where('product_id', $product->id)
