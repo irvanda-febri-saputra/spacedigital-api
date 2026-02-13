@@ -145,12 +145,12 @@ Route::middleware('auth.api.token')->prefix('dashboard')->group(function () {
     // Stock Items
     Route::get('/stocks', [\App\Http\Controllers\StockController::class, 'apiIndex']);
     Route::post('/stocks', [\App\Http\Controllers\StockController::class, 'apiStore']);
-    Route::put('/stocks/{stock}', [\App\Http\Controllers\StockController::class, 'apiUpdate']);
-    Route::delete('/stocks/{stock}', [\App\Http\Controllers\StockController::class, 'apiDestroy']);
     Route::delete('/stocks/bulk-delete', [\App\Http\Controllers\StockController::class, 'apiBulkDelete']);
     Route::post('/stocks/bulk-import', [\App\Http\Controllers\StockController::class, 'apiBulkImport']);
     Route::get('/stocks/stats', [\App\Http\Controllers\StockController::class, 'apiStats']);
     Route::post('/stocks/hastebin', [\App\Http\Controllers\StockController::class, 'apiGenerateHastebin']);
+    Route::put('/stocks/{stock}', [\App\Http\Controllers\StockController::class, 'apiUpdate']);
+    Route::delete('/stocks/{stock}', [\App\Http\Controllers\StockController::class, 'apiDestroy']);
 
     // Broadcast
     Route::post('/broadcast', [\App\Http\Controllers\BroadcastController::class, 'send']);
