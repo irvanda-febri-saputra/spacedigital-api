@@ -162,6 +162,51 @@ class StockController extends Controller
     }
 
     /**
+     * Bulk delete stocks for a product/variant
+     */
+    public function apiBulkDelete(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'variant_id' => 'nullable|exists:product_variants,id',
+        ]);
+
+        // Check ownership (semua user harus punya akses ke bot produk ini)
+        $product = Product::findOrFail($validated['product_id']);
+        $botIds = $user->bots()->pluck('id')->toArray();
+        if (!in_array($product->bot_id, $botIds)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Build delete query
+        $query = StockItem::where('product_id', $validated['product_id'])
+            ->where('is_sold', false); // Only delete available stocks
+
+        if ($validated['variant_id']) {
+            $query->where('variant_id', $validated['variant_id']);
+        }
+
+        // Get count before delete
+        $count = $query->count();
+        
+        // Delete stocks
+        $query->delete();
+
+        // Broadcast bulk delete to bot
+        $this->broadcastBulkStockDeleted($product, $validated['variant_id'] ?? null, $count);
+
+        Log::info("Bulk delete stocks: {$product->name} - {$count} items deleted");
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$count} stock items deleted",
+            'deleted_count' => $count,
+        ]);
+    }
+
+    /**
      * Bulk import stocks
      */
     public function apiBulkImport(Request $request)
@@ -279,6 +324,36 @@ class StockController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::warning("Failed to broadcast stock delete: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Broadcast bulk stock deleted to bot via WebSocket
+     */
+    private function broadcastBulkStockDeleted(Product $product, $variantId, $count)
+    {
+        try {
+            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
+            $wsSecret = env('WS_BROADCAST_SECRET');
+            $bot = $product->bot;
+
+            $variant = $variantId ? ProductVariant::find($variantId) : null;
+
+            Http::timeout(5)->post("{$wsUrl}/broadcast", [
+                'secret' => $wsSecret,
+                'channel' => "bot.{$bot->id}",
+                'event' => 'stock.bulk_deleted',
+                'data' => [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'variant_id' => $variantId,
+                    'variant_name' => $variant?->name,
+                    'deleted_count' => $count,
+                    'timestamp' => now()->toIso8601String(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::warning("Failed to broadcast bulk stock delete: " . $e->getMessage());
         }
     }
 
