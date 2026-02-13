@@ -44,17 +44,17 @@ class StockController extends Controller
 
         // Support 'all' to get all stocks without pagination
         $perPage = $request->get('per_page', 100); // Increased default from 20 to 100
-        
+
         // Custom sorting: stocks older than 1 day on top, newer ones at bottom
         $oneDayAgo = now()->subDay();
         $query->orderByRaw("
-            CASE 
-                WHEN created_at <= ? THEN 0 
-                ELSE 1 
-            END, 
+            CASE
+                WHEN created_at <= ? THEN 0
+                ELSE 1
+            END,
             created_at ASC
         ", [$oneDayAgo]);
-        
+
         if ($perPage === 'all' || $perPage === -1) {
             $stocks = $query->get();
             return response()->json([
@@ -178,10 +178,18 @@ class StockController extends Controller
     {
         $user = $request->user();
 
-        $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'variant_id' => 'nullable|exists:product_variants,id',
+        // Debug logging
+        Log::info('Bulk delete request received', [
+            'params' => $request->all(),
+            'user_id' => $user->id,
         ]);
+
+        $validated = $request->validate([
+            'product_id' => 'required|integer|exists:products,id',
+            'variant_id' => 'nullable|integer|exists:product_variants,id',
+        ]);
+
+        Log::info('Bulk delete validation passed', ['validated' => $validated]);
 
         // Check ownership (semua user harus punya akses ke bot produk ini)
         $product = Product::findOrFail($validated['product_id']);
