@@ -44,16 +44,26 @@ class StockController extends Controller
 
         // Support 'all' to get all stocks without pagination
         $perPage = $request->get('per_page', 100); // Increased default from 20 to 100
+        
+        // Custom sorting: stocks older than 1 day on top, newer ones at bottom
+        $oneDayAgo = now()->subDay();
+        $query->orderByRaw("
+            CASE 
+                WHEN created_at <= ? THEN 0 
+                ELSE 1 
+            END, 
+            created_at ASC
+        ", [$oneDayAgo]);
+        
         if ($perPage === 'all' || $perPage === -1) {
-            $stocks = $query->orderBy('created_at', 'desc')->get();
+            $stocks = $query->get();
             return response()->json([
                 'data' => $stocks,
                 'total' => $stocks->count(),
             ]);
         }
 
-        $stocks = $query->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+        $stocks = $query->paginate($perPage);
 
         return response()->json($stocks);
     }
@@ -190,7 +200,7 @@ class StockController extends Controller
 
         // Get count before delete
         $count = $query->count();
-        
+
         // Delete stocks
         $query->delete();
 
