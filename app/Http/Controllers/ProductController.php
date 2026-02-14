@@ -275,8 +275,8 @@ class ProductController extends Controller
 
         // Broadcast new product to bot via WebSocket
         try {
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
 
             // Parse variants if it's JSON string
             $variants = [];
@@ -410,8 +410,8 @@ class ProductController extends Controller
         // Broadcast product update via WebSocket (includes variants from relationship)
         try {
             $bot = $product->bot;
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
 
             // Get variants from productVariants relationship (not JSON column)
             $variants = $product->productVariants->map(function($v) {
@@ -514,8 +514,8 @@ class ProductController extends Controller
         $bot = $product->bot;
 
         // Broadcast via WebSocket Hub
-        $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-        $wsSecret = env('WS_BROADCAST_SECRET');
+        $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+        $wsSecret = config('app.ws_broadcast_secret');
 
         $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
             'secret' => $wsSecret,
@@ -584,8 +584,8 @@ class ProductController extends Controller
 
         // Broadcast delete via WebSocket
         try {
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
 
             $response = Http::timeout(5)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,

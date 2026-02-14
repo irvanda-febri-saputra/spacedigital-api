@@ -123,4 +123,13 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | WebSocket Hub Configuration
+    |--------------------------------------------------------------------------
+    */
+
+    'ws_hub_url' => env('WS_HUB_URL', 'http://localhost:8080'),
+    'ws_broadcast_secret' => env('WS_BROADCAST_SECRET', ''),
+
 ];
