@@ -60,6 +60,8 @@ services:
       - MAIL_ENCRYPTION=tls
       - MAIL_FROM_ADDRESS=devianfebrisaputra@gmail.com
       - MAIL_FROM_NAME=SpaceDigital
+      - WS_HUB_URL=http://154.26.135.143:5042
+      - WS_BROADCAST_SECRET=bdd683651bfad37f574ff27542d6dd7a13fd8ad0fc9c5e002efa3dfa6c1b4f95
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
