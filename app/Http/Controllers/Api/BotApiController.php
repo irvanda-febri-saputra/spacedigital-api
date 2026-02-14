@@ -1047,19 +1047,18 @@ class BotApiController extends Controller
     {
         // QiosPay webhook payload (adjust according to their actual format)
         $data = $request->all();
-        
+
         // Find transaction by amount and time
         $amount = (int) ($data['amount'] ?? 0);
         $type = $data['type'] ?? '';
-        
+
         if ($type !== 'CR' || $amount <= 0) {
             return response()->json(['message' => 'Not a credit transaction'], 200);
         }
 
-        // Find pending transaction with matching amount
+        // Find pending transaction with matching amount (relaxed gateway check)
         $transaction = Transaction::where('status', 'pending')
             ->where('total_price', $amount)
-            ->where('payment_gateway', 'like', '%qiospay%')
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -1086,17 +1085,17 @@ class BotApiController extends Controller
     private function handleOrderKuotaWebhook(Request $request)
     {
         $data = $request->all();
-        
+
         $amount = (int) ($data['amount'] ?? 0);
         $status = $data['status'] ?? '';
-        
+
         if ($status !== 'success' || $amount <= 0) {
             return response()->json(['message' => 'Not a successful transaction'], 200);
         }
 
+        // Find pending transaction with matching amount (relaxed gateway check)
         $transaction = Transaction::where('status', 'pending')
             ->where('total_price', $amount)
-            ->where('payment_gateway', 'like', '%orderkuota%')
             ->orderBy('created_at', 'desc')
             ->first();
 
