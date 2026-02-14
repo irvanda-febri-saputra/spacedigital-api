@@ -427,8 +427,8 @@ class BotApiController extends Controller
                         // Mark success
                         $transaction->update(['status' => 'success', 'paid_at' => now()]);
 
-                        // Broadcast WebSocket
-                        event(new PaymentStatusUpdated($bot->id, $orderId, 'success', (int)$transaction->total_price, now()->toIso8601String()));
+                        // Broadcast via WebSocket Hub
+                        $this->broadcastPaymentSuccess($transaction);
 
                         return response()->json(['success' => true, 'status' => 'success', 'message' => 'Payment confirmed via Atlantic']);
                     }
@@ -1084,7 +1084,7 @@ class BotApiController extends Controller
 
         // Check if payment successful (adjust status check based on PaKasir format)
         $isSuccess = in_array(strtolower($status), ['success', 'paid', 'settlement', 'completed', '']);
-        
+
         if (!$isSuccess && $status !== '') {
             Log::info("PaKasir webhook: Non-success status '{$status}'");
             return response()->json(['message' => 'Not a successful payment'], 200);

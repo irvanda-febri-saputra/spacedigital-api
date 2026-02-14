@@ -20,47 +20,47 @@ class PaymentPollDaemon extends Command
     public function handle()
     {
         $interval = (int) $this->option('interval');
-        
+
         $this->info('🚀 Starting Unified Payment Daemon...');
         $this->info("  - Polling interval: {$interval}s");
         $this->info("  - Gateways: Atlantic, QiosPay, OrderKuota");
         $this->info('  - Notification: WebSocket (Reverb)');
         $this->info('Press Ctrl+C to stop');
         $this->newLine();
-        
+
         while (true) {
             // Check if ANY pending transactions exist (across all gateways)
             $hasPending = Transaction::where('status', 'pending')
                 ->where('created_at', '>=', now()->subHours(2))
                 ->exists();
-            
+
             // Smart interval: fast when pending, slow when idle (saves resources)
             $sleepTime = $hasPending ? $interval : 30; // 5s when pending, 30s when idle
-            
+
             $processed = 0;
-            
+
             // Only poll if there are pending transactions
             if ($hasPending) {
                 // Poll Atlantic transactions
                 $processed += $this->pollAtlanticTransactions();
-                
+
                 // Poll QiosPay transactions
                 $processed += $this->pollQiosPayTransactions();
-                
+
                 // Poll OrderKuota transactions
                 $processed += $this->pollOrderKuotaTransactions();
             }
-            
+
             sleep($sleepTime);
         }
     }
 
     /**
      * Poll Atlantic transactions - FALLBACK ONLY
-     * 
+     *
      * Primary detection: Webhook (/api/payments/webhook/atlantic)
      * This polling only catches missed webhooks (rare cases)
-     * 
+     *
      * Atlantic webhook already triggers instant cair automatically
      */
     private function pollAtlanticTransactions(): int
@@ -127,9 +127,9 @@ class PaymentPollDaemon extends Command
         // If processing, trigger instant
         if ($result['status'] === 'processing') {
             $this->line("  ⏳ {$transaction->order_id}: Processing → Triggering Instant...");
-            
+
             $instantResult = $gateway->triggerInstant($transaction->payment_ref);
-            
+
             if ($instantResult['success']) {
                 $this->markSuccessAndBroadcast($transaction);
                 return true;
@@ -176,7 +176,7 @@ class PaymentPollDaemon extends Command
     {
         $firstTrx = $transactions->first();
         $gateway = $firstTrx->bot?->activeGateway;
-        
+
         if (!$gateway) return 0;
 
         $credentials = $gateway->credentials ?? [];
@@ -188,7 +188,7 @@ class PaymentPollDaemon extends Command
         try {
             // Call unified endpoint from Worker
             $proxyUrl = env('ORDERKUOTA_PROXY_URL', 'https://workers.czel.me');
-            
+
             $response = Http::timeout(30)->post("{$proxyUrl}/api/unified-mutations", [
                 'gateway' => 'qiospay',
                 'merchant_code' => $merchantCode,
@@ -204,7 +204,7 @@ class PaymentPollDaemon extends Command
 
             $mutations = $result['mutations'] ?? [];
             $processed = 0;
-            
+
             // CRITICAL: Track which mutations have been used in this poll cycle
             $usedMutationRefs = [];
 
@@ -219,15 +219,15 @@ class PaymentPollDaemon extends Command
                 foreach ($mutations as $mutasi) {
                     $mutasiAmount = (int) ($mutasi['amount'] ?? 0);
                     $refId = (string) ($mutasi['ref_id'] ?? '');
-                    
+
                     // CRITICAL: Skip if this mutation was already used in this poll cycle
                     if (in_array($refId, $usedMutationRefs)) {
                         continue;
                     }
-                    
+
                     // CRITICAL: Only match if amounts are equal
                     if ($mutasiAmount !== $amount) continue;
-                    
+
                     // Parse paid_at time
                     $mutasiTime = null;
                     if (isset($mutasi['paid_at'])) {
@@ -237,13 +237,13 @@ class PaymentPollDaemon extends Command
                             $mutasiTime = now();
                         }
                     }
-                    
+
                     // CRITICAL: Verify mutasi is AFTER transaction creation (prevent old payment matching)
                     if ($mutasiTime && $mutasiTime->lt($transactionCreatedAt)) {
                         $this->line("  ⏭️ Skipped old payment: Rp. {$mutasiAmount} (before transaction created)");
                         continue;
                     }
-                    
+
                     // Check if ref_id was already used in DB (primary protection against duplicates)
                     if ($refId) {
                         $existingTrx = Transaction::where('payment_ref', $refId)
@@ -255,15 +255,15 @@ class PaymentPollDaemon extends Command
                             continue;
                         }
                     }
-                    
+
                     // All checks passed - valid match!
                     $this->line("  💵 Matched: {$transaction->order_id} = Rp. {$amount} (ref_id: {$refId})");
-                    
+
                     // CRITICAL: Mark this mutation as used in this poll cycle
                     if ($refId) {
                         $usedMutationRefs[] = $refId;
                     }
-                    
+
                     $transaction->update([
                         'status' => 'success',
                         'paid_at' => $mutasiTime ?? now(),
@@ -316,7 +316,7 @@ class PaymentPollDaemon extends Command
     {
         $firstTrx = $transactions->first();
         $bot = $firstTrx->bot;
-        
+
         if (!$bot) return 0;
 
         // Find OrderKuota gateway for this bot's user
@@ -339,7 +339,7 @@ class PaymentPollDaemon extends Command
         try {
             // Call unified endpoint from Worker
             $proxyUrl = env('ORDERKUOTA_PROXY_URL', 'https://workers.czel.me');
-            
+
             $response = Http::timeout(30)->post("{$proxyUrl}/api/unified-mutations", [
                 'gateway' => 'orderkuota',
                 'username' => $username,
@@ -355,7 +355,7 @@ class PaymentPollDaemon extends Command
 
             $mutations = $result['mutations'] ?? [];
             $processed = 0;
-            
+
             // CRITICAL: Track which mutations have been used in this poll cycle
             $usedMutationRefs = [];
 
@@ -372,15 +372,15 @@ class PaymentPollDaemon extends Command
                     $mutasiAmount = (int) ($mutasi['amount'] ?? 0);
                     $refId = (string) ($mutasi['ref_id'] ?? '');  // This is mutation id (e.g. 187444642)
                     $keterangan = (string) ($mutasi['keterangan'] ?? '');  // Sender name, for logging only
-                    
+
                     // CRITICAL: Skip if this mutation was already used in this poll cycle
                     if (in_array($refId, $usedMutationRefs)) {
                         continue;
                     }
-                    
+
                     // Match by amount only (OrderKuota uses static QRIS, no order_id in payment)
                     if ($mutasiAmount !== $amount) continue;
-                    
+
                     // Parse paid_at time
                     $mutasiTime = null;
                     if (isset($mutasi['paid_at'])) {
@@ -390,13 +390,13 @@ class PaymentPollDaemon extends Command
                             $mutasiTime = now();
                         }
                     }
-                    
+
                     // Verify mutasi is after transaction creation
                     if ($mutasiTime && $mutasiTime->lt($transactionCreatedAt)) {
                         $this->line("  ⏭️ Skipped old payment: {$mutasiAmount} (before transaction)");
                         continue;
                     }
-                    
+
                     // Check if this mutation was already used in DB - CRITICAL for anti-double-drop
                     if ($refId) {
                         $existingTrx = Transaction::where('payment_ref', $refId)
@@ -408,15 +408,15 @@ class PaymentPollDaemon extends Command
                             continue;
                         }
                     }
-                    
+
                     // Match found!
                     $this->line("  💵 Matched: {$transaction->order_id} = Rp. {$amount} (mutation_id: {$refId}, sender: {$keterangan})");
-                    
+
                     // CRITICAL: Mark this mutation as used in this poll cycle
                     if ($refId) {
                         $usedMutationRefs[] = $refId;
                     }
-                    
+
                     $transaction->update([
                         'status' => 'success',
                         'paid_at' => $mutasiTime ?? now(),
