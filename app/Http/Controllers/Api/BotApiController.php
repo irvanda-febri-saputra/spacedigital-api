@@ -1035,6 +1035,10 @@ class BotApiController extends Controller
                 return $this->handleOrderKuotaWebhook($request);
             }
 
+            if ($gateway === 'pakasir') {
+                return $this->handlePakasirWebhook($request);
+            }
+
             return response()->json(['error' => 'Unknown gateway'], 400);
 
         } catch (\Exception $e) {
@@ -1115,6 +1119,54 @@ class BotApiController extends Controller
         $this->broadcastPaymentSuccess($transaction);
 
         return response()->json(['message' => 'Payment processed'], 200);
+    }
+
+    private function handlePakasirWebhook(Request $request)
+    {
+        $data = $request->all();
+        Log::info("PaKasir webhook data", $data);
+
+        // PaKasir webhook format - adjust based on actual payload
+        $amount = (int) ($data['amount'] ?? $data['total'] ?? $data['nominal'] ?? 0);
+        $status = $data['status'] ?? $data['payment_status'] ?? '';
+
+        if ($amount <= 0) {
+            Log::warning("PaKasir webhook: Invalid amount {$amount}");
+            return response()->json(['message' => 'Invalid amount'], 200);
+        }
+
+        // Check if payment successful (adjust status check based on PaKasir format)
+        $isSuccess = in_array(strtolower($status), ['success', 'paid', 'settlement', 'completed', '']);
+        
+        if (!$isSuccess && $status !== '') {
+            Log::info("PaKasir webhook: Non-success status '{$status}'");
+            return response()->json(['message' => 'Not a successful payment'], 200);
+        }
+
+        // Find pending transaction with matching amount
+        $transaction = Transaction::where('status', 'pending')
+            ->where('total_price', $amount)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$transaction) {
+            Log::warning("PaKasir webhook: No matching transaction for amount {$amount}");
+            return response()->json(['message' => 'No matching transaction'], 200);
+        }
+
+        // Update transaction status
+        $transaction->update([
+            'status' => 'success',
+            'paid_at' => now(),
+            'payment_ref' => $data['reference'] ?? $data['trx_id'] ?? $data['transaction_id'] ?? null,
+        ]);
+
+        Log::info("PaKasir payment confirmed: {$transaction->order_id}");
+
+        // Broadcast to bot via WebSocket
+        $this->broadcastPaymentSuccess($transaction);
+
+        return response()->json(['message' => 'Payment processed successfully'], 200);
     }
 
     private function broadcastPaymentSuccess(Transaction $transaction)
