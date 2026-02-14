@@ -13,6 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Apply CORS middleware to API routes
+        $middleware->api(prepend: [
+            \App\Http\Middleware\CorsMiddleware::class,
+        ]);
+        
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\SingleSession::class,
@@ -25,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'turnstile' => \App\Http\Middleware\ValidateTurnstile::class,
             'single.session' => \App\Http\Middleware\SingleSession::class,
             'auth.api.token' => \App\Http\Middleware\AuthenticateApiToken::class,
+            'cors' => \App\Http\Middleware\CorsMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
