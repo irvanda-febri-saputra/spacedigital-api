@@ -16,8 +16,8 @@ class CorsMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         $allowedOrigins = [
-            'https://spacedash.czel.me',
             'https://client.veincloud.net',
+            'https://spacedigital.czel.me',
             'http://localhost:3000',
             'http://localhost:5173',
         ];
