@@ -292,8 +292,8 @@ class StockController extends Controller
     private function broadcastStockAdded(Product $product, $variantId, array $items)
     {
         try {
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
             $bot = $product->bot;
 
             $variant = $variantId ? ProductVariant::find($variantId) : null;
@@ -326,8 +326,8 @@ class StockController extends Controller
     private function broadcastStockDeleted(Product $product, $stockId)
     {
         try {
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
             $bot = $product->bot;
 
             Http::timeout(5)->post("{$wsUrl}/broadcast", [
@@ -351,8 +351,8 @@ class StockController extends Controller
     private function broadcastBulkStockDeleted(Product $product, $variantId, $count)
     {
         try {
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
             $bot = $product->bot;
 
             $variant = $variantId ? ProductVariant::find($variantId) : null;

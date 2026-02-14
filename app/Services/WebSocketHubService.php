@@ -17,9 +17,9 @@ class WebSocketHubService
 
     public function __construct()
     {
-        $this->hubUrl = rtrim(config('services.ws_hub.url', env('WS_HUB_URL', 'http://localhost:5068')), '/');
-        $this->secret = config('services.ws_hub.secret', env('WS_BROADCAST_SECRET', ''));
-        $this->timeout = config('services.ws_hub.timeout', 5);
+        $this->hubUrl = rtrim(config('app.ws_hub_url', 'http://localhost:5068'), '/');
+        $this->secret = config('app.ws_broadcast_secret', '');
+        $this->timeout = config('app.ws_hub_timeout', 5);
     }
 
     /**

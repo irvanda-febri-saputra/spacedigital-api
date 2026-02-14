@@ -410,6 +410,9 @@ class CreateTransactionController extends Controller
                                     'orderkuota_trx_id' => $orderKuotaTrxId,
                                 ]);
 
+                                // Broadcast payment success to bot
+                                $this->broadcastPaymentSuccess($transaction);
+
                                 \Illuminate\Support\Facades\Log::info("Payment matched via dashboard check!", [
                                     'order_id' => $orderId,
                                     'amount' => $amount,
@@ -471,6 +474,9 @@ class CreateTransactionController extends Controller
                                     'paid_at' => $mutasiTime ?? now(),
                                 ]);
 
+                                // Broadcast payment success to bot
+                                $this->broadcastPaymentSuccess($transaction);
+
                                 return response()->json([
                                     'success' => true,
                                     'data' => [
@@ -500,4 +506,43 @@ class CreateTransactionController extends Controller
             ],
         ]);
     }
-}
+
+    /**
+     * Broadcast payment success to bot via WebSocket
+     */
+    private function broadcastPaymentSuccess(\App\Models\Transaction $transaction)
+    {
+        try {
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
+            $bot = $transaction->bot;
+
+            if (!$bot) {
+                \Illuminate\Support\Facades\Log::warning("Transaction {$transaction->order_id} has no bot");
+                return;
+            }
+
+            \Illuminate\Support\Facades\Http::timeout(5)->post("{$wsUrl}/broadcast", [
+                'secret' => $wsSecret,
+                'channel' => "bot.{$bot->id}",
+                'event' => 'payment.success',
+                'data' => [
+                    'order_id' => $transaction->order_id,
+                    'product_name' => $transaction->product_name,
+                    'quantity' => $transaction->quantity,
+                    'total_price' => (int) $transaction->total_price,
+                    'status' => 'success',
+                    'paid_at' => $transaction->paid_at?->toIso8601String(),
+                    'telegram_username' => $transaction->telegram_username,
+                    'telegram_user_id' => $transaction->telegram_user_id,
+                    'timestamp' => now()->toIso8601String(),
+                ],
+            ]);
+
+            \Illuminate\Support\Facades\Log::info("Payment success broadcasted to bot.{$bot->id}", [
+                'order_id' => $transaction->order_id,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to broadcast payment success: " . $e->getMessage());
+        }
+    }
