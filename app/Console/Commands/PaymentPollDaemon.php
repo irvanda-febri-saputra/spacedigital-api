@@ -452,32 +452,36 @@ class PaymentPollDaemon extends Command
     }
 
     /**
-     * Broadcast payment via WebSocket
+     * Broadcast payment via WebSocket Hub (HTTP POST)
      */
     private function broadcastPayment(Transaction $transaction)
     {
         try {
-            event(new PaymentStatusUpdated(
-                $transaction->bot_id,
-                $transaction->order_id,
-                'success',
-                (int) $transaction->total_price,
-                now()->toIso8601String()
-            ));
-        } catch (\Exception $e) {
-            // Fallback to HTTP if WebSocket fails
-            Log::warning('WebSocket broadcast failed, trying HTTP fallback', ['error' => $e->getMessage()]);
-            
-            try {
-                Http::timeout(10)->post('http://localhost:3000/webhook/payment-callback', [
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
+
+            $response = Http::timeout(10)->withHeaders([
+                'X-Broadcast-Secret' => $wsSecret,
+            ])->post("{$wsUrl}/broadcast", [
+                'secret' => $wsSecret,
+                'channel' => "bot.{$transaction->bot_id}",
+                'event' => 'payment.status.updated',
+                'data' => [
+                    'bot_id' => $transaction->bot_id,
                     'order_id' => $transaction->order_id,
                     'status' => 'success',
-                    'amount' => $transaction->total_price,
+                    'amount' => (int) $transaction->total_price,
                     'paid_at' => now()->toIso8601String(),
-                ]);
-            } catch (\Exception $httpError) {
-                Log::error('HTTP fallback also failed', ['error' => $httpError->getMessage()]);
+                ],
+            ]);
+
+            if ($response->successful()) {
+                Log::info("Payment broadcast sent: {$transaction->order_id}");
+            } else {
+                Log::warning("Payment broadcast response: " . $response->body());
             }
+        } catch (\Exception $e) {
+            Log::error("Failed to broadcast payment: " . $e->getMessage());
         }
     }
 }
