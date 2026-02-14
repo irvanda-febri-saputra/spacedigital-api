@@ -525,17 +525,14 @@ class CreateTransactionController extends Controller
             \Illuminate\Support\Facades\Http::timeout(5)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
                 'channel' => "bot.{$bot->id}",
-                'event' => 'payment.success',
+                'event' => 'payment.status.updated',
                 'data' => [
                     'order_id' => $transaction->order_id,
-                    'product_name' => $transaction->product_name,
-                    'quantity' => $transaction->quantity,
-                    'total_price' => (int) $transaction->total_price,
                     'status' => 'success',
+                    'amount' => (int) $transaction->total_price,
                     'paid_at' => $transaction->paid_at?->toIso8601String(),
-                    'telegram_username' => $transaction->telegram_username,
-                    'telegram_user_id' => $transaction->telegram_user_id,
-                    'timestamp' => now()->toIso8601String(),
+                    'gateway' => $transaction->payment_gateway,
+                    'bot_id' => $bot->id,
                 ],
             ]);
 
