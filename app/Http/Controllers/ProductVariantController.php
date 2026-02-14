@@ -201,8 +201,8 @@ class ProductVariantController extends Controller
     private function broadcast(Product $product, string $event, array $data)
     {
         try {
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
             $bot = $product->bot;
 
             Http::timeout(5)->post("{$wsUrl}/broadcast", [

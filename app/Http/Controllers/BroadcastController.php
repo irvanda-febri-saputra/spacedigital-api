@@ -33,8 +33,8 @@ class BroadcastController extends Controller
 
         // Broadcast to bot via WebSocket
         try {
-            $wsUrl = env('WS_HUB_URL', 'http://localhost:8080');
-            $wsSecret = env('WS_BROADCAST_SECRET');
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
 
             $response = Http::timeout(10)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
