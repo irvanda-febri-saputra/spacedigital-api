@@ -282,59 +282,6 @@ class BotApiController extends Controller
     }
 
     /**
-     * Handle payment webhook from gateway
-     *
-     * Usage: POST /api/payments/webhook/{gateway}
-     */
-    public function handleWebhook(Request $request, $gateway)
-    {
-        // Log everything possible for debugging
-        $rawBody = file_get_contents('php://input');
-        $contentType = $request->header('Content-Type');
-
-        Log::info("WEBHOOK RAW DEBUG: Gateway=$gateway", [
-            'content_type' => $contentType,
-            'raw_body' => substr($rawBody, 0, 1000),  // First 1000 chars
-            'request_all' => $request->all(),
-            'post_data' => $_POST,
-            'get_data' => $_GET,
-        ]);
-
-        $payload = $request->all();
-
-        // Fallback 1: Try JSON decode from raw body
-        if (empty($payload) && !empty($rawBody)) {
-            $payload = json_decode($rawBody, true) ?? [];
-        }
-
-        // Fallback 2: Try form-urlencoded parse
-        if (empty($payload) && !empty($rawBody)) {
-            parse_str($rawBody, $payload);
-        }
-
-        // Fallback 3: Use POST data directly
-        if (empty($payload) && !empty($_POST)) {
-            $payload = $_POST;
-        }
-
-        Log::info("WEBHOOK HIT: Gateway=$gateway", ['payload' => $payload]);
-
-        $signature = $request->header('X-Signature') ?? $request->header('X-Callback-Signature');
-
-        $result = $this->paymentService->handleWebhook(
-            $gateway,
-            $payload,
-            $signature
-        );
-
-        if ($result['success']) {
-            return response()->json(['status' => 'ok']);
-        }
-
-        return response()->json(['error' => $result['error']], 400);
-    }
-
-    /**
      * Update transaction status (webhook callback)
      *
      * Usage: POST /api/bot/transactions/{order_id}/status
