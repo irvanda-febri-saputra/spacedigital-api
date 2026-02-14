@@ -1018,5 +1018,138 @@ class BotApiController extends Controller
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Handle payment webhook from payment gateways (QiosPay, OrderKuota, etc.)
+     */
+    public function handleWebhook(Request $request, $gateway)
+    {
+        try {
+            Log::info("Webhook received from {$gateway}", $request->all());
+
+            if ($gateway === 'qiospay') {
+                return $this->handleQiosPayWebhook($request);
+            }
+
+            if ($gateway === 'orderkuota') {
+                return $this->handleOrderKuotaWebhook($request);
+            }
+
+            return response()->json(['error' => 'Unknown gateway'], 400);
+
+        } catch (\Exception $e) {
+            Log::error("Webhook error: " . $e->getMessage());
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
+    }
+
+    private function handleQiosPayWebhook(Request $request)
+    {
+        // QiosPay webhook payload (adjust according to their actual format)
+        $data = $request->all();
+        
+        // Find transaction by amount and time
+        $amount = (int) ($data['amount'] ?? 0);
+        $type = $data['type'] ?? '';
+        
+        if ($type !== 'CR' || $amount <= 0) {
+            return response()->json(['message' => 'Not a credit transaction'], 200);
+        }
+
+        // Find pending transaction with matching amount
+        $transaction = Transaction::where('status', 'pending')
+            ->where('total_price', $amount)
+            ->where('payment_gateway', 'like', '%qiospay%')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$transaction) {
+            Log::warning("QiosPay webhook: No matching transaction for amount {$amount}");
+            return response()->json(['message' => 'No matching transaction'], 200);
+        }
+
+        // Update transaction status
+        $transaction->update([
+            'status' => 'success',
+            'paid_at' => now(),
+            'qiospay_trx_id' => $data['id'] ?? null,
+        ]);
+
+        Log::info("QiosPay payment confirmed: {$transaction->order_id}");
+
+        // Broadcast to bot via WebSocket
+        $this->broadcastPaymentSuccess($transaction);
+
+        return response()->json(['message' => 'Payment processed'], 200);
+    }
+
+    private function handleOrderKuotaWebhook(Request $request)
+    {
+        $data = $request->all();
+        
+        $amount = (int) ($data['amount'] ?? 0);
+        $status = $data['status'] ?? '';
+        
+        if ($status !== 'success' || $amount <= 0) {
+            return response()->json(['message' => 'Not a successful transaction'], 200);
+        }
+
+        $transaction = Transaction::where('status', 'pending')
+            ->where('total_price', $amount)
+            ->where('payment_gateway', 'like', '%orderkuota%')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$transaction) {
+            Log::warning("OrderKuota webhook: No matching transaction for amount {$amount}");
+            return response()->json(['message' => 'No matching transaction'], 200);
+        }
+
+        $transaction->update([
+            'status' => 'success',
+            'paid_at' => now(),
+            'orderkuota_trx_id' => $data['trx_id'] ?? null,
+        ]);
+
+        Log::info("OrderKuota payment confirmed: {$transaction->order_id}");
+
+        $this->broadcastPaymentSuccess($transaction);
+
+        return response()->json(['message' => 'Payment processed'], 200);
+    }
+
+    private function broadcastPaymentSuccess(Transaction $transaction)
+    {
+        try {
+            $wsUrl = config('app.ws_hub_url', 'http://localhost:8080');
+            $wsSecret = config('app.ws_broadcast_secret');
+            $bot = $transaction->bot;
+
+            if (!$bot) {
+                Log::warning("Transaction {$transaction->order_id} has no bot");
+                return;
+            }
+
+            Http::timeout(5)->post("{$wsUrl}/broadcast", [
+                'secret' => $wsSecret,
+                'channel' => "bot.{$bot->id}",
+                'event' => 'payment.status.updated',
+                'data' => [
+                    'order_id' => $transaction->order_id,
+                    'status' => 'success',
+                    'amount' => (int) $transaction->total_price,
+                    'paid_at' => $transaction->paid_at?->toIso8601String(),
+                    'gateway' => $transaction->payment_gateway,
+                    'bot_id' => $bot->id,
+                ],
+            ]);
+
+            Log::info("Payment success broadcasted to bot.{$bot->id}", [
+                'order_id' => $transaction->order_id,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning("Failed to broadcast payment success: " . $e->getMessage());
+        }
+    }
 }
 
