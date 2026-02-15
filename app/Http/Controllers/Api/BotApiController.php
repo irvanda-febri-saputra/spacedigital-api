@@ -986,6 +986,10 @@ class BotApiController extends Controller
                 return $this->handlePakasirWebhook($request);
             }
 
+            if ($gateway === 'atlantic' || str_contains($gateway, 'atlantic')) {
+                return $this->handleAtlanticWebhook($request);
+            }
+
             return response()->json(['error' => 'Unknown gateway'], 400);
 
         } catch (\Exception $e) {
@@ -1116,6 +1120,55 @@ class BotApiController extends Controller
         return response()->json(['message' => 'Payment processed successfully'], 200);
     }
 
+    private function handleAtlanticWebhook(Request $request)
+    {
+        $data = $request->all();
+        Log::info("Atlantic webhook data", $data);
+
+        // Atlantic Cloudflare Workers webhook format
+        // Expected: { order_id, invoice, status, amount, payment_ref, etc }
+        $orderId = $data['order_id'] ?? $data['invoice'] ?? $data['trx_id'] ?? null;
+        $status = $data['status'] ?? '';
+        $amount = (int) ($data['amount'] ?? 0);
+
+        if (!$orderId) {
+            Log::warning("Atlantic webhook: No order ID");
+            return response()->json(['message' => 'Missing order ID'], 400);
+        }
+
+        // Check if payment successful
+        if (!in_array(strtolower($status), ['success', 'paid', 'settlement', 'completed', 'processing'])) {
+            Log::info("Atlantic webhook: Non-success status '{$status}'");
+            return response()->json(['message' => 'Not a successful payment'], 200);
+        }
+
+        // Find transaction by order_id or payment_ref
+        $transaction = Transaction::where(function($q) use ($orderId) {
+            $q->where('order_id', $orderId)
+              ->orWhere('payment_ref', $orderId);
+        })
+        ->where('status', 'pending')
+        ->first();
+
+        if (!$transaction) {
+            Log::warning("Atlantic webhook: No matching transaction for {$orderId}");
+            return response()->json(['message' => 'No matching transaction'], 404);
+        }
+
+        // Update transaction status
+        $transaction->update([
+            'status' => 'success',
+            'paid_at' => now(),
+        ]);
+
+        Log::info("Atlantic payment confirmed: {$transaction->order_id}");
+
+        // Broadcast to bot via WebSocket
+        $this->broadcastPaymentSuccess($transaction);
+
+        return response()->json(['message' => 'Payment processed successfully'], 200);
+    }
+
     private function broadcastPaymentSuccess(Transaction $transaction)
     {
         try {
@@ -1131,9 +1184,12 @@ class BotApiController extends Controller
             Http::timeout(5)->post("{$wsUrl}/broadcast", [
                 'secret' => $wsSecret,
                 'channel' => "bot.{$bot->id}",
-                'event' => 'payment.status.updated',
+                'event' => 'payment.success',
                 'data' => [
                     'order_id' => $transaction->order_id,
+                    'trx_id' => $transaction->order_id,
+                    'invoice' => $transaction->order_id,
+                    'payment_id' => $transaction->payment_ref,
                     'status' => 'success',
                     'amount' => (int) $transaction->total_price,
                     'paid_at' => $transaction->paid_at?->toIso8601String(),
