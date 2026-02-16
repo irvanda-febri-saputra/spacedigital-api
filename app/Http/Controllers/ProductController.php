@@ -350,6 +350,15 @@ class ProductController extends Controller
             'sort_order' => 'sometimes|integer|min:0',
         ]);
 
+        // Prevent product name change (name is immutable identifier for bot sync)
+        if (isset($validated['name']) && $validated['name'] !== $product->name) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Product name cannot be changed. Please delete and recreate the product if you need to change the name.',
+                'message' => 'Nama produk tidak dapat diubah. Hapus dan buat ulang produk jika perlu mengubah nama.'
+            ], 400);
+        }
+
         // Separate variants from product data
         $variantsData = $validated['variants'] ?? null;
         unset($validated['variants']);
