@@ -186,30 +186,32 @@ class PaymentPollDaemon extends Command
         if (!$apiKey || !$merchantCode) return 0;
 
         try {
-            // Call unified endpoint from Worker
-            $proxyUrl = env('ORDERKUOTA_PROXY_URL', 'https://workers.czel.me');
-
-            $response = Http::timeout(30)->post("{$proxyUrl}/api/unified-mutations", [
-                'gateway' => 'qiospay',
-                'merchant_code' => $merchantCode,
-                'api_key' => $apiKey,
-            ]);
-
+            // Direct call to QiosPay mutasi API (no worker needed)
+            $url = "https://qiospay.id/api/mutasi/qris/{$merchantCode}/{$apiKey}";
+            $response = Http::withoutVerifying()->timeout(30)->get($url);
             $result = $response->json();
 
-            if (!($result['success'] ?? false)) {
-                $this->error("  Unified API error: " . ($result['error'] ?? 'Unknown error'));
-                return 0;
+            $rawMutations = $result['data'] ?? [];
+            if (!is_array($rawMutations)) {
+                $rawMutations = [];
             }
 
-            $mutations = $result['mutations'] ?? [];
-            $processed = 0;
+            // Map QiosPay mutation format to match daemon
+            $mutations = [];
+            foreach ($rawMutations as $item) {
+                if (($item['type'] ?? '') !== 'CR') continue;
+                $mutations[] = [
+                    'amount' => (int) ($item['amount'] ?? 0),
+                    'ref_id' => (string) ($item['issuer_reff'] ?? $item['buyer_reff'] ?? $item['id'] ?? ''),
+                    'paid_at' => $item['date'] ?? $item['created_at'] ?? now()->toDateTimeString(),
+                ];
+            }
 
-            // CRITICAL: Track which mutations have been used in this poll cycle
+            $processed = 0;
             $usedMutationRefs = [];
 
             // Debug
-            $this->line("  📋 Found " . count($mutations) . " mutations (unified format)");
+            $this->line("  📋 Found " . count($mutations) . " QiosPay mutations");
 
             // Match transactions with mutations
             foreach ($transactions as $transaction) {
